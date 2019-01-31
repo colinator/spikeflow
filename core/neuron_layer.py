@@ -23,6 +23,10 @@ class NeuronLayer(ComputationLayer):
 class IdentityNeuronLayer(NeuronLayer):
     """ Implements a layer of pass-through neurons. Output = Input """
 
+    def __init__(self, n):
+        super().__init__()
+        self.n = n
+
     def _ops(self):
         return [self.input, self.assign_op]
 
@@ -188,14 +192,40 @@ class IzhikevichNeuronLayer(NeuronLayer):
         return cls(configuration, dt)
 
     @classmethod
+    def configuration_with_n_identical_neurons(cls, n, a, b, c, d, t, v0):
+        """ Creates a configuration for the constructor for n identical izhikevich neurons
+        Args:
+            a, b, c, d, t, v0: floats
+        """
+        return np.tile(np.array([a, b, c, d, t, v0]), (n,1))
+
+    @classmethod
+    def configuration_with_n_distributions(cls, n, a_dist, b_dist, c_dist, d_dist, t_dist, v0_dist):
+        """ Creates a configuration for the constructor forn neurons, whose configuration
+        values are pulled from distribution generation functions.
+        Args:
+            a_dist, b_dist, c_dist, d_dist, t_dist, v0_dist: functions that
+            generate n float values according to any distribution.
+        """
+        return np.array([a_dist(n), b_dist(n), c_dist(n), d_dist(n), t_dist(n), v0_dist(n)]).T
+
+    @classmethod
+    def layer_with_configurations(cls, configurations, dt):
+        """ Creates a layer from a list of configurations
+        Args:
+            configuration: list of configurations
+            dt: state update timestep, float
+        """
+        return cls(np.concatenate(configurations), dt)
+
+    @classmethod
     def layer_with_n_identical_neurons(cls, n, a, b, c, d, t, v0, dt):
         """ Creates a layer of n identical neurons.
         Args:
             a, b, c, d, t, v0: floats
             dt: state update timestep, float
         """
-        configuration = np.tile(np.array([a, b, c, d, t, v0]), (n,1))
-        return cls(configuration, dt)
+        return cls(cls.configuration_with_n_identical_neurons(n, a, b, c, d, t, v0), dt)
 
     @classmethod
     def layer_with_n_distributions(cls, n, a_dist, b_dist, c_dist, d_dist, t_dist, v0_dist, dt):
@@ -206,9 +236,8 @@ class IzhikevichNeuronLayer(NeuronLayer):
             generate n float values according to any distribution.
             dt: state update timestep, float
         """
-        configuration = np.array([a_dist(n), b_dist(n), c_dist(n), d_dist(n), t_dist(n), v0_dist(n)]).T
+        configuration = cls.configuration_with_n_distributions(n, a_dist, b_dist, c_dist, d_dist, t_dist, v0_dist)
         return cls(configuration, dt)
-
 
     def to_dataframe(self):
         """ Returns a pandas Dataframe containing the neuron configurations.

@@ -38,13 +38,13 @@ class TraceRenderer:
 class IdentityNeuronTraceRenderer(TraceRenderer):
 
     def height(self, dpi):
-        return 0.8 * self.traces.shape[2]
+        return 0.8 * self.traces.shape[1]
 
     def subfigure_height_ratios(self, dpi):
-        return [1, 1] + [3, 1, 1] * (self.traces.shape[2]-1)
+        return [1, 1] + [3, 1, 1] * (self.traces.shape[1]-1)
 
     def render(self, fig, gs, gs_start, start_time, end_time):
-        for i in range(self.traces.shape[2]):
+        for i in range(self.traces.shape[1]):
             for t in range(2):
                 ax = fig.add_subplot(gs[gs_start+(i*3)+t])
                 if t == 0:
