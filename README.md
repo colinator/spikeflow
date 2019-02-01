@@ -8,32 +8,36 @@ Spiking neural networks in tensorflow.
 
 The purpose of this library is to explore the connection between computational neuroscience and machine learning, and to practice implementing efficient and fast models in tensorflow.
 
-Spikeflow makes it easy to create arbitrarily connected layers of spiking neurons, and thence to 'step time'.
+Spikeflow makes it easy to create arbitrarily connected layers of spiking neurons into a tensorflow graph, and then to 'step time'.
 
-Spikeflow will concentrate on facilitating the exploration of spiking neuron models, local-only learning rules, dynamic network construction, and the role of inhibition in the control of attractor dynamics.
+Spikeflow will concentrate on facilitating the exploration of spiking neuron models, local-only learning rules, dynamic network construction, the role of inhibition in the control of attractor dynamics, etc.
 
-Spikeflow will implement:
+The library will implement:
 - multiple models of spiking neurons, including
-  - Leaky Integrate-and-fire
-  - Izhikevich
-  - Hodgkin-Huxley
-- arbitrary connections between layers of similar neurons, including feed-foward, recurrent, skip connections, and inhibition.
+  - [x] Leaky Integrate-and-fire
+  - [x] Izhikevich
+  - [ ] Hodgkin-Huxley
+- arbitrary connections between layers of similar neurons, including
+  - [x] feed-foward
+  - [x] recurrent
+  - [x] inhibitory
 - multiple models of synapses, including
-  - simple weights
-  - decay synapses
-  - delay synapses
+  - [x] simple weights
+  - [x] synapses with decay
+  - [ ] synapses with delay
+  - [ ] neuron-aware synapses
 - out-of-graph and in-graph learning rules, including
-  - simple hebbian synaptic modification
-  - symmetric and asymmetric STDP
+  - [ ] simple hebbian synaptic modification
+  - [ ] symmetric and asymmetric STDP
 - forms of dynamic neural network construction, including
-  - Synaptic pruning and synaptogenesis
-  - Neuron pruning and neurogenesis
-  - Other structure modification
+  - [ ] Synaptic pruning and synaptogenesis
+  - [ ] Neuron pruning and neurogenesis
+  - [ ] Other structure modification
 
-The basic modeling idea is this:
+#### The basic modeling idea is this:
 
 ```
-model = BPNNModel(input_shape,
+model = BPNNModel.compiled_model(input_shape,
   [ neuronlayer1, neuronlayer2, ...],
   [ connections1, connections2, ...])
 
