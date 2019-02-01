@@ -30,7 +30,7 @@ Spikeflow will implement:
   - Neuron pruning and neurogenesis
   - Other structure modification
 
-The basic modelling idea is this:
+The basic modeling idea is this:
 
 ```
 model = BPNNModel(input_shape,

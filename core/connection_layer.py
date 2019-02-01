@@ -11,6 +11,7 @@ Synapse = namedtuple('Synapse', ['from_neuron_index', 'to_neuron_index', 'v'])
 
 def weights_from_synapses(from_layer, to_layer, synapses):
     """ Constructs a weight matrix from the given synapses.
+
     Args:
         from_layer: the pre-synaptic neuron layer
         to_neuron: the post-synaptic neuron layer
@@ -21,9 +22,11 @@ def weights_from_synapses(from_layer, to_layer, synapses):
         w[s.from_neuron_index, s.to_neuron_index] = s.v
     return w
 
+
 def weights_connecting_from_to(from_layer, to_layer, connectivity, v_sampler, from_range=None, to_range=None):
     """ Constructs a weight matrix by connecting each neuron in from_layer to
     a random set of neurons in to_layer.
+
     Args:
         from_layer: the pre-synaptic neuron layer
         to_layer: the post-synaptic neuron layer
@@ -47,28 +50,42 @@ def weights_connecting_from_to(from_layer, to_layer, connectivity, v_sampler, fr
     return w
 
 
+
 class ConnectionLayer(ComputationLayer):
-
-    def compile_output_node(self):
-        pass
-
-
-class AbstractSynapseLayer(ConnectionLayer):
+    """ Base class for all connection layers.
+    """
 
     def __init__(self, from_layer, to_layer):
+        """ Constructs a connection layer.
+        Args:
+            from_layer: NeuronLayer
+            to_layer: NeuronLayer
+        """
         super().__init__()
         self.from_layer = from_layer
         self.to_layer = to_layer
 
 
-class SimpleSynapseLayer(AbstractSynapseLayer):
+    def _compile_output_node(self):
+        """ Child classes must implement this. Will be called in the context
+        of a graph during network construction phase. This method will be called
+        before compile(), and must create an output tensor, which will be
+        connected to to_layer's input.
+        """
+        pass
+
+
+class SimpleSynapseLayer(ConnectionLayer):
+    """ A connection layer of simple synapses (just a weight matrix that multiplies
+    the input).
+    """
 
     def __init__(self, from_layer, to_layer, weights):
         super().__init__(from_layer, to_layer)
         self.w = weights
         self.output_op = None
 
-    def compile_output_node(self):
+    def _compile_output_node(self):
         self.output = tf.Variable(np.zeros((self.w.shape[1],), dtype=np.float32), name='SSL_Input')
 
     def _ops(self):
@@ -82,7 +99,10 @@ class SimpleSynapseLayer(AbstractSynapseLayer):
         self.output_op = self.output.assign(o_reshaped)
 
 
-class DecaySynapseLayer(SimpleSynapseLayer):
+class DecaySynapseLayer(ConnectionLayer):
+    """ A connection layer of synapses that decay exponentially. Basically just
+    a weight matrix that is multiplied by a single layer-wide decay factor.
+    """
 
     def __init__(self, from_layer, to_layer, decay, weights):
         super().__init__(from_layer, to_layer, weights)

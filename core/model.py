@@ -50,7 +50,7 @@ class BPNNModel:
             # get connection outputs
             connection_tos = {}
             for connection in self.connections:
-                connection.compile_output_node()
+                connection._compile_output_node()
                 to_i = self.neuron_layers.index(connection.to_layer)
                 connection_tos.setdefault(to_i, []).append(connection.output)
 
