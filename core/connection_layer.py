@@ -99,7 +99,7 @@ class SimpleSynapseLayer(ConnectionLayer):
         self.output_op = self.output.assign(o_reshaped)
 
 
-class DecaySynapseLayer(ConnectionLayer):
+class DecaySynapseLayer(SimpleSynapseLayer):
     """ A connection layer of synapses that decay exponentially. Basically just
     a weight matrix that is multiplied by a single layer-wide decay factor.
     """
