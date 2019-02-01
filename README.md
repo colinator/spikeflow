@@ -25,6 +25,7 @@ The library will implement:
   - [x] simple weights
   - [x] synapses with decay
   - [ ] synapses with delay
+  - [ ] synapses with failure
   - [ ] neuron-aware synapses
 - out-of-graph and in-graph learning rules, including
   - [ ] simple hebbian synaptic modification
