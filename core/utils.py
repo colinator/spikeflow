@@ -20,6 +20,11 @@ Samplers: sometimes closures can be more concise than classes.
 Are they as clear? These oughtta be, I hope...
 """
 
+def list_sampler(l):
+    def ls(n):
+        return floats_arr(np.array(l[:n]))
+    return ls
+
 def identical_sampler(v):
     return lambda n: floats_arr(np.ones((n,)) * v)
 

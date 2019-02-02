@@ -12,6 +12,10 @@ class NeuronLayer(ComputationLayer):
     Really, just adds a single operation: add_input.
     """
 
+    def __init__(self, n):
+        super().__init__()
+        self.n = n
+
     def add_input(self, new_input):
         """ Adds the new_input to the summation operation tree.
         Args:
@@ -24,8 +28,7 @@ class IdentityNeuronLayer(NeuronLayer):
     """ Implements a layer of pass-through neurons. Output = Input """
 
     def __init__(self, n):
-        super().__init__()
-        self.n = n
+        super().__init__(n)
 
     def _ops(self):
         return [self.input, self.assign_op]
@@ -50,8 +53,8 @@ class LIFNeuronLayer(NeuronLayer):
     C = namedtuple('LIFNeuronConfig', ['r', 'c', 't', 'refrac'])
 
     def __init__(self, neuron_configuration, dt=0.5):
-        super().__init__()
-        self.n = neuron_configuration.shape[0]
+        super().__init__(neuron_configuration.shape[0])
+
         self.r = neuron_configuration[:,0] # resistance
         self.c = neuron_configuration[:,1] # capacitance
         self.t = neuron_configuration[:,2] # threshhold
@@ -160,9 +163,8 @@ class IzhikevichNeuronLayer(NeuronLayer):
             one neuron. Columns 0 through 5 represent values of a, b, c, d, t, and v0.
             dt: python float value for dt.
         """
-        super().__init__()
+        super().__init__(neuron_configuration.shape[0])
 
-        self.n = neuron_configuration.shape[0]
         self.a = neuron_configuration[:,0]
         self.b = neuron_configuration[:,1]
         self.c = neuron_configuration[:,2]
