@@ -2,6 +2,10 @@
 
 Spiking neural networks in tensorflow.
 
+***Installation:*** pip install coming soon. I'll wait until it achieves just a little bit of stability... some feedback'd help here...
+
+
+
 **Hypothesis:** Biological plausibility in neural networks is not an obstacle, but a benefit, for machine learning applications.
 
 **Proof:** None. Yet.
