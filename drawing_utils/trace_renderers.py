@@ -64,7 +64,7 @@ class LIFNeuronTraceRenderer(TraceRenderer):
 
     def render(self, fig, gs, gs_start, start_time, end_time):
         for i in range(self.traces.shape[2]):
-            for j, t in enumerate([0, 3, 1]):
+            for j, t in enumerate([0, 3, 2]):
                 ax = fig.add_subplot(gs[gs_start+(i*4)+j])
                 if t == 0:
                     ax.set_title(self.name + ' ' + str(i))
@@ -94,28 +94,38 @@ class IzhikevichNeuronTraceRenderer(TraceRenderer):
 
 class NeuronFiringsRenderer(TraceRenderer):
 
-    def __init__(self, traces, firing_height, name):
+    def __init__(self, traces, firing_height, name, groups=None):
         super().__init__(traces, name)
         self.firing_height = firing_height
+        self.groups = groups
 
     def height(self, dpi):
-        return (1.0 / dpi) * self.traces.shape[1] * self.firing_height + 1.0
+        return (2.0 / dpi) * self.traces.shape[1] * self.firing_height + 1.0
 
     def subfigure_height_ratios(self, dpi):
-        return [(1.0 / dpi) * self.traces.shape[1] * self.firing_height + 1.0]
+        return [(2.0 / dpi) * self.traces.shape[1] * self.firing_height + 1.0]
 
     def render(self, fig, gs, gs_start, start_time, end_time):
         data = self.traces[start_time:end_time,:].T
-        data_to_render = np.flipud(np.repeat(data, self.firing_height, axis=0))
+        data2 = np.repeat(data, 3).reshape(data.shape[0], data.shape[1], 3)
+        data3 = data2 * (np.array([0.0, 0.0, 1.0]) * -1.0 + 0.95) * -1.0 + 0.95
+        if self.groups is not None:
+            for (fromn, ton, color) in self.groups:
+                k = data2[fromn:ton,:,:] * (np.array(color) * -1.0 + 0.95) * -1.0 + 0.95
+                data3[fromn:ton,:,:] = k
+        data_to_render = np.flipud(np.repeat(data3, self.firing_height, axis=0))
         ax = fig.add_subplot(gs[gs_start])
         ax.set_title(self.name)
         plt.box(on=None)
-        ax.set_ylabel('n', color='b')
+        ax.set_ylabel('neuron i')
+        ax.set_xlabel('timestep t')
         ax.set_ylim((-5, data_to_render.shape[0]+5))
         ax.set_xlim((0, end_time-start_time))
         plt.yticks([])
         plt.xticks([])
-        plt.imshow(data_to_render, 'Blues', aspect='auto')
+        plt.imshow(data_to_render, aspect='auto', interpolation='nearest')
+        #plt.imshow(data_to_render, 'Blues', aspect='auto', interpolation='nearest')
+        #plt.imshow(data_to_render, 'RdBu', aspect='auto', interpolation='nearest')
 
 
 def render_figure(renderers, start_time, end_time, dpi=100):
@@ -134,4 +144,23 @@ def render_figure(renderers, start_time, end_time, dpi=100):
         gs_start += len(renderer.subfigure_height_ratios(dpi)) + 1
 
     plt.xticks([i for i in range(0, end_time-start_time, 100)])
+    plt.show()
+
+
+def draw_firing_distributions(layer_firings, groups=None, dpi=100):
+    fig = plt.figure(num=None, figsize=(2 * len(layer_firings), 0.6), dpi=dpi)
+    gs = gridspec.GridSpec(1, len(layer_firings), hspace=1.0)
+    for i, firings in enumerate(layer_firings):
+        rates = firing_rates(firings)
+        df = pd.DataFrame(rates, index = range(len(rates)), columns = ['r'])
+        ax = fig.add_subplot(gs[i])
+        ax.spines['bottom'].set_color('grey')
+        ax.spines['top'].set_color('grey')
+        ax.spines['left'].set_color('grey')
+        ax.spines['right'].set_color('grey')
+        ax.set_xlim((0, df['r'].max() + 0.01))
+        ax.set_title('Layer ' + str(i) + ": " + str(len(rates)) + ' neurons', fontsize=9)
+        bins = max(17, df['r'].nunique() // 7)
+        df['r'].hist(bins=bins, grid=False, xlabelsize=7, ylabelsize=7, ax=ax)
+
     plt.show()
