@@ -28,8 +28,8 @@ The library will implement:
 - multiple models of synapses, including
   - [x] simple weights
   - [x] synapses with decay
+  - [x] synapses with failure
   - [ ] synapses with delay
-  - [ ] synapses with failure
   - [ ] neuron-aware synapses
 - out-of-graph and in-graph learning rules, including
   - [ ] simple hebbian synaptic modification

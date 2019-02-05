@@ -11,6 +11,8 @@ def draw_synapse_layer(synapse_layer, dpi=100):
     """ Draws a synapse layer as image of weights
     """
 
-    plt.imshow(synapse_layer.w, 'Blues', aspect='auto')
+    plt.imshow(synapse_layer.w, 'RdBu', aspect='auto')
+    plt.ylabel('from neuron')
+    plt.xlabel('to neuron')
     plt.box(on=False)
     plt.show()

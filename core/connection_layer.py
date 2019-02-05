@@ -114,3 +114,26 @@ class DecaySynapseLayer(SimpleSynapseLayer):
         o = tf.matmul(tf.expand_dims(input_f, 0), self.weights)
         o_decayed = tf.reshape(o, [-1]) + self.output * self.decay
         self.output_op = self.output.assign(o_decayed)
+
+
+class DecaySynapseLayerWithFailure(SimpleSynapseLayer):
+    """ A connection layer of synapses that decay exponentially. Basically just
+    a weight matrix that is multiplied by a single layer-wide decay factor,
+    and failing to transmit anything at all with single layer-wide failure
+    probability.
+    """
+
+    def __init__(self, from_layer, to_layer, decay, failure_prob, weights):
+        super().__init__(from_layer, to_layer, weights)
+        self.decay = decay
+        self.failure_prob = failure_prob
+
+    def _compile(self):
+        self.weights = tf.Variable(self.w)
+        random_noise = tf.random_uniform(self.weights.shape, 0, 1.0)
+        succeeding_weights = tf.to_float(tf.greater(random_noise, self.failure_prob))
+        result_weights = self.weights * succeeding_weights
+        input_f = tf.to_float(self.input)
+        o = tf.matmul(tf.expand_dims(input_f, 0), result_weights)
+        o_decayed = tf.reshape(o, [-1]) + self.output * self.decay
+        self.output_op = self.output.assign(o_decayed)
