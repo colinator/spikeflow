@@ -86,8 +86,12 @@ class BPNNModel:
 
         Args:
             data_generator: a generator that must produce data with shape self.input_shape
-            post_batch_callback: function (results: { layer_index: layer _ops output})
-                Dictionary of keys to results, where keys are the indexes of
+            post_batch_callback: function (i: incrementing integer index
+                                           graph: the tensorflow graph
+                                           sess: the tensorflow session
+                                           results: { layer_index: layer _ops output})
+
+                results: Dictionary of keys to results, where keys are the indexes of
                 computation layers (in order neuron layers, then connection layers,
                 by addition), and results are outputs of the layer _ops
                 array, which was just run in session.run.
@@ -102,6 +106,6 @@ class BPNNModel:
 
         with tf.Session(graph=self.graph) as sess:
             tf.global_variables_initializer().run()
-            for data in data_generator:
+            for i, data in enumerate(data_generator):
                 results = sess.run(runnables, feed_dict={self.input: data})
-                post_batch_callback(results)
+                post_batch_callback(i, self.graph, sess, results)

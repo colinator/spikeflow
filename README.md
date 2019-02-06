@@ -32,6 +32,7 @@ The library will implement:
   - [x] synapses with post-synaptic reset
   - [ ] synapses with delay
 - out-of-graph and in-graph learning rules, including
+  - [x] out-of-graph weight modification
   - [ ] simple hebbian synaptic modification
   - [ ] symmetric and asymmetric STDP
 - forms of dynamic neural network construction, including
