@@ -29,8 +29,8 @@ The library will implement:
   - [x] simple weights
   - [x] synapses with decay
   - [x] synapses with failure
+  - [x] synapses with post-synaptic reset
   - [ ] synapses with delay
-  - [ ] neuron-aware synapses
 - out-of-graph and in-graph learning rules, including
   - [ ] simple hebbian synaptic modification
   - [ ] symmetric and asymmetric STDP
