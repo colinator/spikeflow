@@ -20,7 +20,7 @@ The library will implement:
 - multiple models of spiking neurons, including
   - [x] Leaky Integrate-and-fire
   - [x] Izhikevich
-  - [ ] Hodgkin-Huxley
+  - [ ] Hodgkin-Huxley? Taking requests...
 - arbitrary connections between layers of similar neurons, including
   - [x] feed-foward
   - [x] recurrent
@@ -30,7 +30,7 @@ The library will implement:
   - [x] synapses with decay
   - [x] synapses with failure
   - [x] synapses with post-synaptic reset
-  - [ ] synapses with delay
+  - [x] synapses with delay
 - out-of-graph and in-graph learning rules, including
   - [x] out-of-graph weight modification
   - [ ] simple hebbian synaptic modification
