@@ -54,6 +54,21 @@ def weights_connecting_from_to(from_layer, to_layer, connectivity, v_sampler, fr
     return w
 
 
+def samples_for_weights(weights, sampler):
+    try:
+        return np.float32(operator.index(sampler))
+    except:
+        indexes = np.nonzero(weights)
+        delays = np.zeros(weights.shape)
+        delays[indexes] = sampler(len(indexes[0]))
+        return delays
+
+def delays_for_weights(weights, delay_sampler):
+    return samples_for_weights(weights, delay_sampler)
+
+def decays_for_weights(weights, decay_sampler):
+    return samples_for_weights(weights, decay_sampler)
+
 
 class ConnectionLayer(ComputationLayer):
     """ Base class for all connection layers.
@@ -112,14 +127,16 @@ class SynapseLayer(ConnectionLayer):
 
 class ComplexSynapseLayer(SynapseLayer):
     """ A connection layer of synapses with additional capabilities:
-    
+
     decay: synaptic sum values will decay in time: single layer-wide float
     failure_prob: some synapses might fail to transmit: single layer-wide float
     post_synaptic_reset_factor: when post synaptic neuron fires, scale synaptic
         sum values immediately: single layer-wide float
+    delay: synaptic-level delay matrix. Each value is int: number of timesteps
+        of delay to apply to that synapse. Must match shape and topology of weights.
     """
 
-    def __init__(self, from_layer, to_layer, weights, decay=None, failure_prob=None, post_synaptic_reset_factor=None):
+    def __init__(self, from_layer, to_layer, weights, decay=None, failure_prob=None, post_synaptic_reset_factor=None, delay=None, max_delay=None):
         """ Constructs a ComplexSynapseLayer.
         Args:
             from_layer: from neuron layer
@@ -130,48 +147,95 @@ class ComplexSynapseLayer(SynapseLayer):
             post_synaptic_reset_factor: float (likely [0,1] but not necessarily),
                 amount to scale post synaptic summation in the event post-synaptic
                 neuron fires
+            delay: int (single layer-wide delay) or np.array(ints), which
+                must match shape and topology of weights (same indexes of non-zero
+                weights).
+            max_delay: int, maximum possible value for delay
         """
 
         super().__init__(from_layer, to_layer, weights)
         self.decay = decay
         self.failure_prob = failure_prob
         self.post_synaptic_reset_factor = post_synaptic_reset_factor
+        self.delay = delay
+        self.max_delay = max_delay
 
+    def _ops(self):
+        return [self.input, self.output, self.output_op]
 
     def _compile(self):
 
         # define variables
         self.weights = tf.Variable(self.w)
+
         input_f = tf.to_float(self.input)
 
-        if self.post_synaptic_reset_factor is not None:
-            pstf_inv = tf.to_float(1.0 - self.post_synaptic_reset_factor)
-        else:
+        if self.post_synaptic_reset_factor is None:
             pstf_inv = None
+        else:
+            pstf_inv = tf.to_float(1.0 - self.post_synaptic_reset_factor)
 
         # make some synapses fail (just bring their weights to 0)
-        if self.failure_prob is not None:
-            random_noise = tf.random_uniform(self.weights.shape, 0, 1.0)
-            succeeding_weights = tf.to_float(tf.greater(random_noise, self.failure_prob))
-            result_weights = self.weights * succeeding_weights
+        if self.failure_prob is None:
+            succeeding_weights = self.weights
         else:
-            result_weights = self.weights
+            random_noise = tf.random_uniform(self.weights.shape, 0, 1.0)
+            succeeding_weights = self.weights * tf.to_float(tf.greater(random_noise, self.failure_prob))
 
-        # compute post-synaptic sums
-        o = tf.matmul(tf.expand_dims(input_f, 0), result_weights)
-        o_resh = tf.reshape(o, [-1])
+        # synaptic-level delay
+        inputs_flat = tf.expand_dims(input_f, 0)
+        if self.delay is None:
+            o = tf.matmul(inputs_flat, succeeding_weights)
+            o_delayed = tf.reshape(o, [-1])
+        else:
+            # Create a tensor variable to hold the delays (so we can change them)
+            self.delays = tf.Variable(self.delay)
+
+            n = self.w.shape[0]*self.w.shape[1]
+            d_max = self.max_delay if self.max_delay is not None else int(np.max(self.delay))
+
+            # Create a variable: n (input*output neurons) by d_max tensor
+            # to hold propagating synaptic values
+            propagating_values = tf.Variable(np.zeros((n, d_max+1)), dtype=tf.float32)
+
+            # get 2d tensor of scatter indices from delays
+            delays_flat = tf.cast(tf.reshape(self.delays, [-1]), tf.int32)
+            indices = tf.range(0, n)
+            delay_scatter_indices = tf.transpose(tf.reshape(tf.concat([indices, delays_flat], axis=0), (2, n)))
+
+            # multiply inputs by weights element-wise, and flatten
+            multed_inputs = tf.transpose(tf.multiply(tf.transpose(succeeding_weights), input_f))
+            flat_inputs = tf.reshape(multed_inputs, (-1,))
+
+            # roll the propagation tensor by 1 timestep down
+            propagation_rolled = tf.roll(propagating_values, shift=-1, axis=1)
+            roll_op = propagating_values.assign(propagation_rolled)
+
+            # scatter input into the propagation tensor
+            k = tf.scatter_nd_update(roll_op, delay_scatter_indices, flat_inputs)
+            prop_op = propagating_values.assign(k)
+
+            # get the 0th timestep's values
+            final_out = prop_op[:,0]
+
+            # reshape back into same shape as weight matrix
+            r_out = tf.reshape(final_out, self.weights.shape)
+
+            # sum per output neuron
+            o_delayed = tf.reduce_sum(r_out, axis=0)
+
 
         # apply decay
-        if self.decay is not None:
-            o_decayed = o_resh + self.output * self.decay
+        if self.decay is None:
+            o_decayed = o_delayed
         else:
-            o_decayed = o_resh
+            o_decayed = o_delayed + self.output * self.decay
 
         # if the post-synaptic layer fired, scale my output by post-synaptic reset factor
-        if pstf_inv is not None:
-            o_reset = o_decayed - tf.to_float(self.to_layer.output) * pstf_inv * o_decayed
-        else:
+        if pstf_inv is None:
             o_reset = o_decayed
+        else:
+            o_reset = o_decayed - tf.to_float(self.to_layer.output) * pstf_inv * o_decayed
 
         # top of graph
         self.output_op = self.output.assign(o_reset)
