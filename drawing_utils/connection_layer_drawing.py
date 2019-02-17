@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from spikeflow import ConnectionLayer, SimpleSynapseLayer, DecaySynapseLayer
+from spikeflow import ConnectionLayer, SynapseLayer, ComplexSynapseLayer
 
 """
 The point of this library is not really these convenience rendering functions.

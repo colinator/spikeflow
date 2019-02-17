@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from collections import namedtuple
-from spikeflow.core.utils import floats_uniform, floats_normal
+from spikeflow.core.utils import floats_uniform, floats_normal, identical_ints_sampler
 from spikeflow.core.computation_layer import ComputationLayer
 
 
@@ -157,7 +157,7 @@ class ComplexSynapseLayer(SynapseLayer):
         self.decay = decay
         self.failure_prob = failure_prob
         self.post_synaptic_reset_factor = post_synaptic_reset_factor
-        self.delay = delay
+        self.delay = delay if not np.isscalar(delay) else delays_for_weights(weights, identical_ints_sampler(delay))
         self.max_delay = max_delay
 
     def _ops(self):
@@ -165,7 +165,7 @@ class ComplexSynapseLayer(SynapseLayer):
 
     def _compile(self):
 
-        # define variables
+        # define object variable for weights
         self.weights = tf.Variable(self.w)
 
         input_f = tf.to_float(self.input)
