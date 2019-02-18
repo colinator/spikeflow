@@ -55,6 +55,17 @@ def weights_connecting_from_to(from_layer, to_layer, connectivity, v_sampler, fr
 
 
 def samples_for_weights(weights, sampler):
+    """ Creates a matrix of the same shape as weights,
+    with values drawn from sampler everywhere weights is non-zero,
+    and zero otherwise. Used, for instance, for creating a delay
+    matrix to match a weight matrix.
+    Args:
+        weights: a 2d weight matrix
+        sampler: a function that return n random values, or a scalar
+    Return:
+        a matrix of values drawn from sampler, same shape and
+        topology as weights
+    """
     try:
         return np.float32(operator.index(sampler))
     except:
@@ -64,9 +75,11 @@ def samples_for_weights(weights, sampler):
         return delays
 
 def delays_for_weights(weights, delay_sampler):
+    """ Creates a delay matrix for a corresponding weight matrix, using a sampler """
     return samples_for_weights(weights, delay_sampler)
 
 def decays_for_weights(weights, decay_sampler):
+    """ Creates a decay matrix for a corresponding weight matrix, using a sampler """
     return samples_for_weights(weights, decay_sampler)
 
 
@@ -134,6 +147,8 @@ class ComplexSynapseLayer(SynapseLayer):
         sum values immediately: single layer-wide float
     delay: synaptic-level delay matrix. Each value is int: number of timesteps
         of delay to apply to that synapse. Must match shape and topology of weights.
+        NOTE: using this feature will create a tensor of shape n x t, where n is the
+        number of synapses, and t is the maximum delay, in number of timesteps.
     """
 
     def __init__(self, from_layer, to_layer, weights, decay=None, failure_prob=None, post_synaptic_reset_factor=None, delay=None, max_delay=None):
