@@ -19,7 +19,7 @@ def weights_from_synapses(from_layer, to_layer, synapses):
     Return:
         weights: np.array((from_layer.n, to_layer.n), float32)
     """
-    w = np.zeros((from_layer.n, to_layer.n), dtype=np.float32)
+    w = np.zeros((from_layer.output_n, to_layer.input_n), dtype=np.float32)
     for s in synapses:
         w[s.from_neuron_index, s.to_neuron_index] = s.v
     return w
@@ -43,8 +43,8 @@ def weights_connecting_from_to(from_layer, to_layer, connectivity, v_sampler, fr
         weights: np.array((from_layer.n, to_layer.n), float32)
     """
     w = np.zeros((from_layer.n, to_layer.n), dtype=np.float32)
-    fr = (0, from_layer.n) if from_range is None else from_range
-    tr = (0, to_layer.n) if to_range is None else to_range
+    fr = (0, from_layer.output_n) if from_range is None else from_range
+    tr = (0, to_layer.input_n) if to_range is None else to_range
     n = int(connectivity * (tr[1] - tr[0]))
     for from_i in range(fr[0], fr[1]):
         v_arr = v_sampler(n)
@@ -76,24 +76,24 @@ def samples_for_weights(weights, sampler):
 
 def delays_for_weights(weights, delay_sampler):
     """ Creates a delay matrix for a corresponding weight matrix, using a sampler """
-    return samples_for_weights(weights, delay_sampler)
+    return np.maximum(samples_for_weights(weights, delay_sampler), np.zeros(weights.shape))
 
 def decays_for_weights(weights, decay_sampler):
     """ Creates a decay matrix for a corresponding weight matrix, using a sampler """
-    return samples_for_weights(weights, decay_sampler)
+    return np.minimum(np.maximum(samples_for_weights(weights, decay_sampler), weights * 0), np.ones(weights.shape))
 
 
 class ConnectionLayer(ComputationLayer):
     """ Base class for all connection layers.
     """
 
-    def __init__(self, from_layer, to_layer):
+    def __init__(self, name, from_layer, to_layer):
         """ Constructs a connection layer.
         Args:
             from_layer: NeuronLayer
             to_layer: NeuronLayer
         """
-        super().__init__()
+        super().__init__(name)
         self.from_layer = from_layer
         self.to_layer = to_layer
 
@@ -112,14 +112,14 @@ class SynapseLayer(ConnectionLayer):
     the input).
     """
 
-    def __init__(self, from_layer, to_layer, weights):
+    def __init__(self, name, from_layer, to_layer, weights):
         """ Constructs a (simple) SynapseLayer.
         Args:
             from_layer: from neuron layer
             to_layer: to neuron layer
             weights: np.array((from_layer.n, to_layer.n), float32)
         """
-        super().__init__(from_layer, to_layer)
+        super().__init__(name, from_layer, to_layer)
         self.w = weights
         self.output_op = None
 
@@ -151,7 +151,7 @@ class ComplexSynapseLayer(SynapseLayer):
         number of synapses, and t is the maximum delay, in number of timesteps.
     """
 
-    def __init__(self, from_layer, to_layer, weights, decay=None, failure_prob=None, post_synaptic_reset_factor=None, delay=None, max_delay=None):
+    def __init__(self, name, from_layer, to_layer, weights, decay=None, failure_prob=None, post_synaptic_reset_factor=None, delay=None, max_delay=None):
         """ Constructs a ComplexSynapseLayer.
         Args:
             from_layer: from neuron layer
@@ -168,7 +168,7 @@ class ComplexSynapseLayer(SynapseLayer):
             max_delay: int, maximum possible value for delay
         """
 
-        super().__init__(from_layer, to_layer, weights)
+        super().__init__(name, from_layer, to_layer, weights)
         self.decay = decay
         self.failure_prob = failure_prob
         self.post_synaptic_reset_factor = post_synaptic_reset_factor

@@ -12,9 +12,16 @@ class NeuronLayer(ComputationLayer):
     Really, just adds a single operation: add_input.
     """
 
-    def __init__(self, n):
-        super().__init__()
-        self.n = n
+    def __init__(self, name):
+        super().__init__(name)
+
+    @property
+    def input_n(self):
+        pass
+
+    @property
+    def output_n(self):
+        pass
 
     def add_input(self, new_input):
         """ Adds the new_input to the summation operation tree.
@@ -27,8 +34,17 @@ class NeuronLayer(ComputationLayer):
 class IdentityNeuronLayer(NeuronLayer):
     """ Implements a layer of pass-through neurons. Output = Input """
 
-    def __init__(self, n):
-        super().__init__(n)
+    def __init__(self, name, n):
+        super().__init__(name)
+        self.n = n
+
+    @property
+    def input_n(self):
+        return self.n
+
+    @property
+    def output_n(self):
+        return self.n
 
     def _ops(self):
         return [self.input, self.assign_op]
@@ -52,23 +68,32 @@ class LIFNeuronLayer(NeuronLayer):
 
     C = namedtuple('LIFNeuronConfig', ['resistance', 'tau', 'threshhold', 'n_refrac'])
 
-    def __init__(self, neuron_configuration, dt=0.5):
+    def __init__(self, name, neuron_configuration, dt=0.5):
         """ LIFNeuronLayer constructor
         Args:
             neuron_configuration: 2d numpy array; columns are
             resistance, tau, capacitance, n_refrac
             dt: single timestep dt value.
         """
-        super().__init__(neuron_configuration.shape[0])
+        super().__init__(name)
 
+        self.n = neuron_configuration.shape[0]
         self.resistance = neuron_configuration[:,0]
         self.tau = neuron_configuration[:,1]
         self.threshhold = neuron_configuration[:,2]
         self.n_refrac = neuron_configuration[:,3].astype(np.int32)
         self.dt = np.float32(dt)
 
+    @property
+    def input_n(self):
+        return self.n
+
+    @property
+    def output_n(self):
+        return self.n
+
     @classmethod
-    def layer_from_tuples(cls, neuron_configuration_tuples, dt=0.5):
+    def layer_from_tuples(cls, name, neuron_configuration_tuples, dt=0.5):
         """ Creates a layer from the given configuration tuples.
         Args:
             neuron_configuration_tuples: [LIFNeuronLayer.C]
@@ -80,20 +105,20 @@ class LIFNeuronLayer(NeuronLayer):
         thresh = np.array([nn.threshhold for nn in nct], dtype=np.float32)
         refrac = np.array([nn.n_refrac for nn in nct], dtype=np.float32)
         configuration = np.array([res, tau, thresh, refrac]).T
-        return cls(configuration, dt)
+        return cls(name, configuration, dt)
 
     @classmethod
-    def layer_with_n_identical_neurons(cls, n, resistance, tau, threshhold, n_refrac, dt):
+    def layer_with_n_identical_neurons(cls, name, n, resistance, tau, threshhold, n_refrac, dt):
         """ Creates a layer of n identical neurons.
         Args:
             resistance, tau, threshhold, n_refrac: floats
             dt: state update timestep, float
         """
         configuration = np.tile(np.array([r, c, t, refrac]), (n,1))
-        return cls(configuration, dt)
+        return cls(name, configuration, dt)
 
     @classmethod
-    def layer_with_n_distributions(cls, n, resistance_dist, tau_dist, threshhold_dist, n_refrac_dist, dt):
+    def layer_with_n_distributions(cls, name, n, resistance_dist, tau_dist, threshhold_dist, n_refrac_dist, dt):
         """ Creates a layer of n neurons, whose configuration values are pulled from
         distribution generation functions.
         Args:
@@ -101,7 +126,7 @@ class LIFNeuronLayer(NeuronLayer):
             dt: state update timestep, float
         """
         configuration = np.array([resistance_dist(n), tau_dist(n), threshhold_dist(n), n_refrac_dist(n)]).T
-        return cls(configuration, dt)
+        return cls(name, configuration, dt)
 
     def to_dataframe(self):
         """ Returns a pandas Dataframe containing the neuron configurations.
@@ -157,7 +182,7 @@ class IzhikevichNeuronLayer(NeuronLayer):
 
     C = namedtuple('IzhikevichNeuronConfig', ['a', 'b', 'c', 'd', 't', 'v0'])
 
-    def __init__(self, neuron_configuration, dt=0.5):
+    def __init__(self, name, neuron_configuration, dt=0.5):
         """Creates an IzhikevichNeuronLayer with the given neuron configurations.
 
         Args:
@@ -165,8 +190,9 @@ class IzhikevichNeuronLayer(NeuronLayer):
             one neuron. Columns 0 through 5 represent values of a, b, c, d, t, and v0.
             dt: state update timestep, float
         """
-        super().__init__(neuron_configuration.shape[0])
+        super().__init__(name)
 
+        self.n = neuron_configuration.shape[0]
         self.a = neuron_configuration[:,0]
         self.b = neuron_configuration[:,1]
         self.c = neuron_configuration[:,2]
@@ -179,8 +205,16 @@ class IzhikevichNeuronLayer(NeuronLayer):
         self.u_op = None
         self.fired_op = None
 
+    @property
+    def input_n(self):
+        return self.n
+
+    @property
+    def output_n(self):
+        return self.n
+
     @classmethod
-    def layer_from_tuples(cls, neuron_configuration_tuples, dt=0.5):
+    def layer_from_tuples(cls, name, neuron_configuration_tuples, dt=0.5):
         """ Creates a layer from the given configuration tuples.
         Args:
             neuron_configuration_tuples: [IzhikevichNeuronLayer.C]
@@ -193,7 +227,7 @@ class IzhikevichNeuronLayer(NeuronLayer):
         t = np.array([nn.t for nn in neuron_configuration_tuples], dtype=np.float32)
         v0 = np.array([nn.v0 for nn in neuron_configuration_tuples], dtype=np.float32)
         configuration = np.array([a, b, c, d, t, v0]).T
-        return cls(configuration, dt)
+        return cls(name, configuration, dt)
 
     @classmethod
     def configuration_with_n_identical_neurons(cls, n, a, b, c, d, t, v0):
@@ -214,25 +248,25 @@ class IzhikevichNeuronLayer(NeuronLayer):
         return np.array([a_dist(n), b_dist(n), c_dist(n), d_dist(n), t_dist(n), v0_dist(n)]).T
 
     @classmethod
-    def layer_with_configurations(cls, configurations, dt):
+    def layer_with_configurations(cls, name, configurations, dt):
         """ Creates a layer from a list of configurations
         Args:
             configuration: list of configurations
             dt: state update timestep, float
         """
-        return cls(np.concatenate(configurations), dt)
+        return cls(name, np.concatenate(configurations), dt)
 
     @classmethod
-    def layer_with_n_identical_neurons(cls, n, a, b, c, d, t, v0, dt):
+    def layer_with_n_identical_neurons(cls, name, n, a, b, c, d, t, v0, dt):
         """ Creates a layer of n identical neurons.
         Args:
             a, b, c, d, t, v0: floats
             dt: state update timestep, float
         """
-        return cls(cls.configuration_with_n_identical_neurons(n, a, b, c, d, t, v0), dt)
+        return cls(name, cls.configuration_with_n_identical_neurons(n, a, b, c, d, t, v0), dt)
 
     @classmethod
-    def layer_with_n_distributions(cls, n, a_dist, b_dist, c_dist, d_dist, t_dist, v0_dist, dt):
+    def layer_with_n_distributions(cls, name, n, a_dist, b_dist, c_dist, d_dist, t_dist, v0_dist, dt):
         """ Creates a layer of n neurons, whose configuration values are pulled from
         distribution generation functions.
         Args:
@@ -241,7 +275,7 @@ class IzhikevichNeuronLayer(NeuronLayer):
             dt: state update timestep, float
         """
         configuration = cls.configuration_with_n_distributions(n, a_dist, b_dist, c_dist, d_dist, t_dist, v0_dist)
-        return cls(configuration, dt)
+        return cls(name, configuration, dt)
 
     def to_dataframe(self):
         """ Returns a pandas Dataframe containing the neuron configurations.
@@ -252,7 +286,12 @@ class IzhikevichNeuronLayer(NeuronLayer):
 
 
     def _ops(self):
+        #return { 'input': self.input, 'v': self.v_op, 'u': self.u_op, 'output': self.fired_op }
         return [self.input, self.v_op, self.u_op, self.fired_op]
+
+    # @classmethod
+    # def ops_result_tensor(cls, ops_result):
+    #     return [ ops_result['input'], ops_result['v'], ops_result['u'], ops_result['output']]
 
     def _compile(self):
 

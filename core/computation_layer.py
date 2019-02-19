@@ -8,11 +8,13 @@ class ComputationLayer:
     2 abstract methods the subclasses must implement
 
     Variables:
+        name: name of the layer. Must be unique within sibling layers.
         input: tf.Tensor operation, such as tf.Variable
         output: tf.Tensor operation, such as tf.Variable
     """
 
-    def __init__(self):
+    def __init__(self, name):
+        self.name = name
         self.input = None
         self.output = None
 

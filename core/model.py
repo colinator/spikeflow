@@ -1,17 +1,69 @@
 import tensorflow as tf
+from spikeflow.core.neuron_layer import NeuronLayer
 
-class BPNNModel:
 
+class CompositeLayer(NeuronLayer):
+
+    def __init__(self, name, neuron_layers, connections):
+        super().__init__(name)
+        self.neuron_layers = neuron_layers
+        self.connections = connections
+
+    @property
+    def input_n(self):
+        return self.neuron_layers[0].n
+
+    @property
+    def output_n(self):
+        return self.neuron_layers[-1].n
+
+    def _ops(self):
+        computation_layers = self.neuron_layers + self.connections
+        return { clayer.name: clayer._ops() for clayer in computation_layers }
+
+    def _compile(self):
+
+        # NOTE: my input must already exist
+
+        # get connection outputs
+        connection_tos = {}
+        for connection in self.connections:
+            connection._compile_output_node()
+            to_i = self.neuron_layers.index(connection.to_layer)
+            connection_tos.setdefault(to_i, []).append(connection.output)
+
+        # first neuron layer gets model inputs
+        if len(self.neuron_layers) > 0:
+            self.neuron_layers[0].add_input(self.input)
+
+        # all neuron layers can get synaptic inputs
+        for i, neuron_layer in enumerate(self.neuron_layers):
+            for connection_input in connection_tos.get(i, []):
+                neuron_layer.add_input(connection_input)
+
+        # compile neuron layers
+        for neuron_layer in self.neuron_layers:
+            neuron_layer._compile()
+
+        # hook up synapse layer inputs
+        for connection in self.connections:
+            connection.input = connection.from_layer.output
+            connection._compile()
+
+        # finally, my output is the last neuron layer output
+        self.output = self.neuron_layers[-1].output
+
+
+class BPNNModel(CompositeLayer):
     """ Top-level biologically plausible neural network model runner.
     Contains neuron and connection layers. Can compile to tensorflow graph, and
     then run through time, feeding input.
     """
 
     def __init__(self, input_shape):
+        super().__init__('top', [], [])
         self.input_shape = input_shape
         self.input = None
-        self.neuron_layers = []
-        self.connections = []
         self.graph = None
 
     @classmethod
@@ -47,30 +99,8 @@ class BPNNModel:
             # create input tensor
             self.input = tf.placeholder(tf.float32, shape=self.input_shape, name='I')
 
-            # get connection outputs
-            connection_tos = {}
-            for connection in self.connections:
-                connection._compile_output_node()
-                to_i = self.neuron_layers.index(connection.to_layer)
-                connection_tos.setdefault(to_i, []).append(connection.output)
-
-            # first neuron layer gets model inputs
-            if len(self.neuron_layers) > 0:
-                self.neuron_layers[0].add_input(self.input)
-
-            # all neuron layers can get synaptic inputs
-            for i, neuron_layer in enumerate(self.neuron_layers):
-                for connection_input in connection_tos.get(i, []):
-                    neuron_layer.add_input(connection_input)
-
-            # compile neuron layers
-            for neuron_layer in self.neuron_layers:
-                neuron_layer._compile()
-
-            # hook up synapse layer inputs
-            for connection in self.connections:
-                connection.input = connection.from_layer.output
-                connection._compile()
+            # compile neuron layers and connections
+            self._compile()
 
 
     def run_time(self, data_generator, post_batch_callback):
@@ -98,11 +128,7 @@ class BPNNModel:
                 Called after every step of data generation.
         """
 
-        computation_layers = self.neuron_layers + self.connections
-
-        # NOTE! This is weak: why do I actually need to use all _ops? Why can't
-        # I just run the top-level (final?) one? (tried, doesn't work).
-        runnables = { i: clayer._ops() for i, clayer in enumerate(computation_layers) }
+        runnables = self._ops()
 
         with tf.Session(graph=self.graph) as sess:
             tf.global_variables_initializer().run()
