@@ -9,7 +9,8 @@ from spikeflow.core.utils import *
 class NeuronLayer(ComputationLayer):
 
     """ A computation layer that contains neurons.
-    Really, just adds a single operation: add_input.
+    Really, just adds a single operation: add_input,
+    and defines number of inputs and outputs.
     """
 
     def __init__(self, name):
@@ -17,10 +18,16 @@ class NeuronLayer(ComputationLayer):
 
     @property
     def input_n(self):
+        """ Subclasses must implement; returns number of inputs
+        """
         pass
 
     @property
     def output_n(self):
+        """ Subclasses must implement; returns number of outputs.
+        For normal neuron layers, should be equal to input_n. Composite
+        layers might be different.
+        """
         pass
 
     def add_input(self, new_input):
@@ -37,6 +44,9 @@ class IdentityNeuronLayer(NeuronLayer):
     def __init__(self, name, n):
         super().__init__(name)
         self.n = n
+
+        if n <= 0:
+            raise ValueError('IdentityNeuronLayer must have at least one neuron.')
 
     @property
     def input_n(self):
@@ -76,6 +86,13 @@ class LIFNeuronLayer(NeuronLayer):
             dt: single timestep dt value.
         """
         super().__init__(name)
+
+        if len(neuron_configuration.shape) != 2:
+            raise ValueError('LIFNeuronLayer must be initialized with configuration with 2 dimensions; n rows by 4 columns')
+        if neuron_configuration.shape[0] <= 0:
+            raise ValueError('LIFNeuronLayer must have at least one neuron.')
+        if neuron_configuration.shape[1] != 4:
+            raise ValueError('LIFNeuronLayer configuration must have 4 columns; resistance, tau, threshhold, n_refrac.')
 
         self.n = neuron_configuration.shape[0]
         self.resistance = neuron_configuration[:,0]
@@ -192,6 +209,13 @@ class IzhikevichNeuronLayer(NeuronLayer):
         """
         super().__init__(name)
 
+        if len(neuron_configuration.shape) != 2:
+            raise ValueError('IzhikevichNeuronLayer must be initialized with configuration with 2 dimensions; n rows by 6 columns')
+        if neuron_configuration.shape[0] <= 0:
+            raise ValueError('IzhikevichNeuronLayer must have at least one neuron.')
+        if neuron_configuration.shape[1] != 6:
+            raise ValueError('IzhikevichNeuronLayer configuration must have 6 columns; a, b, c, d, threshhold, v0')
+
         self.n = neuron_configuration.shape[0]
         self.a = neuron_configuration[:,0]
         self.b = neuron_configuration[:,1]
@@ -286,12 +310,7 @@ class IzhikevichNeuronLayer(NeuronLayer):
 
 
     def _ops(self):
-        #return { 'input': self.input, 'v': self.v_op, 'u': self.u_op, 'output': self.fired_op }
         return [self.input, self.v_op, self.u_op, self.fired_op]
-
-    # @classmethod
-    # def ops_result_tensor(cls, ops_result):
-    #     return [ ops_result['input'], ops_result['v'], ops_result['u'], ops_result['output']]
 
     def _compile(self):
 
