@@ -127,7 +127,7 @@ class SynapseLayer(ConnectionLayer):
         self.output = tf.Variable(np.zeros((self.w.shape[1],), dtype=np.float32), name='Synapse_Layer_Output')
 
     def _ops(self):
-        return [self.input, self.output, self.output_op]
+        return [self.input, self.output_op]
 
     def _compile(self):
         self.weights = tf.Variable(self.w)
@@ -149,6 +149,8 @@ class ComplexSynapseLayer(SynapseLayer):
         of delay to apply to that synapse. Must match shape and topology of weights.
         NOTE: using this feature will create a tensor of shape n x t, where n is the
         number of synapses, and t is the maximum delay, in number of timesteps.
+    max_delay: maximum value for delay. If not none, the above-mentioned delay
+        tensor will be of shape n x max_delay.
     """
 
     def __init__(self, name, from_layer, to_layer, weights, decay=None, failure_prob=None, post_synaptic_reset_factor=None, delay=None, max_delay=None):
@@ -174,9 +176,6 @@ class ComplexSynapseLayer(SynapseLayer):
         self.post_synaptic_reset_factor = post_synaptic_reset_factor
         self.delay = delay if not np.isscalar(delay) else delays_for_weights(weights, identical_ints_sampler(delay))
         self.max_delay = max_delay
-
-    def _ops(self):
-        return [self.input, self.output, self.output_op]
 
     def _compile(self):
 

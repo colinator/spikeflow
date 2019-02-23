@@ -4,18 +4,31 @@ from spikeflow.core.neuron_layer import NeuronLayer
 
 class CompositeLayer(NeuronLayer):
 
+    """ A layer that looks like a neuron layer, but that can have any arbitrary
+    internal structure, containing layers and connections. There is a single
+    input, which is the input to the first neuron layer, and a single output,
+    which is the output of the last neuron layer. In between: anything can happen.
+    """
+
     def __init__(self, name, neuron_layers, connections):
+        """ Creates a composite layer.
+        Args:
+            neuron_layers: list of NeuronLayer
+            connections: list of ConnectionLayer
+        """
         super().__init__(name)
         self.neuron_layers = neuron_layers
         self.connections = connections
 
     @property
     def input_n(self):
-        return self.neuron_layers[0].n
+        """ The number of inputs is the number of inputs in the first neuron layer. """
+        return self.neuron_layers[0].input_n
 
     @property
     def output_n(self):
-        return self.neuron_layers[-1].n
+        """ The number of outputs is the number of outputs in the last neuron layer. """
+        return self.neuron_layers[-1].output_n
 
     def _ops(self):
         computation_layers = self.neuron_layers + self.connections
@@ -23,7 +36,8 @@ class CompositeLayer(NeuronLayer):
 
     def _compile(self):
 
-        # NOTE: my input must already exist
+        if len(self.neuron_layers) == 0:
+            raise ValueError("Composites and models must contain at least one neuron layer.")
 
         # get connection outputs
         connection_tos = {}
@@ -33,8 +47,7 @@ class CompositeLayer(NeuronLayer):
             connection_tos.setdefault(to_i, []).append(connection.output)
 
         # first neuron layer gets model inputs
-        if len(self.neuron_layers) > 0:
-            self.neuron_layers[0].add_input(self.input)
+        self.neuron_layers[0].add_input(self.input)
 
         # all neuron layers can get synaptic inputs
         for i, neuron_layer in enumerate(self.neuron_layers):
@@ -124,7 +137,7 @@ class BPNNModel(CompositeLayer):
                 results: Dictionary of keys to results, where keys are the indexes of
                 computation layers (in order neuron layers, then connection layers,
                 by addition), and results are outputs of the layer _ops
-                array, which was just run in session.run.
+                method calls, which was just run in session.run.
                 Called after every step of data generation.
         """
 
