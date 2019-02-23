@@ -25,6 +25,7 @@ The library will implement:
   - [x] feed-foward
   - [x] recurrent
   - [x] inhibitory
+  - [x] layer compositing (layers can have sub-layers with a single input and output)
 - multiple models of synapses, including
   - [x] simple weights
   - [x] synapses with decay

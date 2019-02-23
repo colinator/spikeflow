@@ -129,6 +129,9 @@ class SynapseLayer(ConnectionLayer):
     def _ops(self):
         return [self.input, self.output_op]
 
+    def ops_format(self):
+        return ['input', 'output']
+
     def _compile(self):
         self.weights = tf.Variable(self.w)
         input_f = tf.to_float(self.input)

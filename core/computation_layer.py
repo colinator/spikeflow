@@ -21,6 +21,8 @@ class ComputationLayer:
     def _ops(self):
         """ Subclasses need to return [tf.Tensor operation]
         An array of tensor operations that session.run should evaluate.
+        Or: a dictionary of names to ops values - basically anything that
+        can be fed to tensorflow's session.run method's fetches parameter.
         """
         pass
 
@@ -28,4 +30,8 @@ class ComputationLayer:
         """ Compile the tensorflow graph operations. Herein may construct
         output and input.
         """
+        pass
+
+    def ops_format(self):
+        """ Gets a description of what ops returns. """
         pass

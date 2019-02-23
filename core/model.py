@@ -34,6 +34,10 @@ class CompositeLayer(NeuronLayer):
         computation_layers = self.neuron_layers + self.connections
         return { clayer.name: clayer._ops() for clayer in computation_layers }
 
+    def ops_format(self):
+        computation_layers = self.neuron_layers + self.connections
+        return { clayer.name: clayer.ops_format() for clayer in computation_layers }
+
     def _compile(self):
 
         if len(self.neuron_layers) == 0:

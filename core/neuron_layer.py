@@ -59,6 +59,9 @@ class IdentityNeuronLayer(NeuronLayer):
     def _ops(self):
         return [self.input, self.assign_op]
 
+    def ops_format(self):
+        return ['input', 'output']
+
     def _compile(self):
         self.output = tf.Variable(np.zeros(self.input.shape, dtype=np.float32), dtype=np.float32, name='output')
         self.assign_op = self.output.assign(self.input)
@@ -155,6 +158,9 @@ class LIFNeuronLayer(NeuronLayer):
 
     def _ops(self):
         return [self.input, self.recovery_op, self.fired_op, self.v_op]
+
+    def ops_format(self):
+        return ['input', 'recovery', 'fired', 'v']
 
     def _compile(self):
         nintzeros = np.zeros((self.n,), dtype=np.int32)
@@ -311,6 +317,9 @@ class IzhikevichNeuronLayer(NeuronLayer):
 
     def _ops(self):
         return [self.input, self.v_op, self.u_op, self.fired_op]
+
+    def ops_format(self):
+        return ['input', 'v', 'u', 'fired']
 
     def _compile(self):
 
