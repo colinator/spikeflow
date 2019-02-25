@@ -1,27 +1,10 @@
 import numpy as np
+from spikeflow.core.spike_process import *
 
 
 """
-A 'firings' is a record of neuron firings: np.array of shape (num_timesteps, num_neurons)
-where each element is a boolean: True means a neuron fired at a timestep.
-
-A 'spike process' is a list of arrays of integer indexes at which a neuron spiked,
-one list for each neuron. [ np.array(ints) ] where each int is a timestep index.
-
-This is where typed-python might make sense.
+Some useful tools for analysis - get spike counts, firing rates, etc.
 """
-
-
-def firings_to_processes(firings):
-    """ Converts firings numpy tensor to array of spike processes. These are
-    simply numpy arrays of timestep indexes for which each neuron fired.
-    Args:
-        firings: np.array((timesteps, # neurons)) of bools; True = spike
-    Returns:
-        [ np.array([indexes of firings (where firings==True)]) ]
-    """
-    return [ np.reshape(np.argwhere(firings[:,i]), (-1,)) for i in range(firings.shape[1]) ]
-
 
 def spike_counts(spike_processes):
     """ Gets the number of times each neuron fired.
