@@ -1,6 +1,9 @@
 import numpy as np
 
 """
+Defines types for firings and spike processes, and functions to convert
+between them.
+
 
 firing: np.array((num_timesteps,), dtype=bool)
     A 'firing' is firing record for a single neuron: a numpy array of bools, one
@@ -21,6 +24,13 @@ This is where typed-python might make sense.
 """
 
 def firing_to_spike_process(firing):
+    """ Converts a firing record for a single neuron to a spike process:
+    a list of time step indexes at which the neuron fired.
+    Args:
+        firing: firing record for a single neuron
+    Returns:
+        spike_process for a single neuron
+    """
     return np.reshape(np.argwhere(firing), (-1,))
 
 
@@ -28,20 +38,20 @@ def firings_to_spike_processes(firings):
     """ Converts firings numpy tensor to array of spike processes. These are
     simply numpy arrays of timestep indexes for which each neuron fired.
     Args:
-        firings: np.array((timesteps, # neurons)) of bools; True = spike
+        firings: firing records for multiple neurons
     Returns:
-        [ np.array([indexes of firings (where firings==True)]) ]
+        spike_processes, one for each neuron
     """
     return [ firing_to_spike_process(firings[:,i]) for i in range(firings.shape[1]) ]
 
 
 def spike_process_to_firing(spike_process, max_length=None):
-    """ Converts
+    """ Converts a single neuron spike processes to a firing record.
     Args:
-        spike_process: numpy array of integers, where each value is the time of a spike.
+        spike_process: spike_process for a single neuron
+        max_length: if highest timestep is < max_length, pads to max_length with 0s
     Returns:
-        numpy array of booleans: False for no spike, True for spike, length maximum
-        of spike_process
+        firing record for one neuron
     """
     length = max(np.max(spike_process)+1, 0 if max_length is None else max_length)
     firing = np.zeros((length,), dtype=bool)
@@ -50,14 +60,12 @@ def spike_process_to_firing(spike_process, max_length=None):
 
 
 def spike_processes_to_firings(spike_processes, max_length=None):
-    """ Converts a list of spike processes to a single n x t numpy array of booleans
+    """ Converts spike processes to firing records.
     Args:
-        spike_processes: list of spike processes
-        max_time: max time to pad out the resulting array to
+        spike_processes: list of spike processes for multiple neurons
+        max_length: if highest timestep is < max_length, pads to max_length with 0s
     Returns:
-        numpy array of n x t, where n is the number of spike processes, and
-        t is either the largest value in spike processes, or max_time, if max_time
-        is not None. Values in the result are either 0 (no spike) or 1 (spike)
+        firing record for multiple neurons
     """
     length = max(np.max(spike_processes)+1, 0 if max_length is None else max_length)
     firings = np.zeros((length, len(spike_processes)), dtype=bool)
