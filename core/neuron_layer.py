@@ -72,6 +72,14 @@ class LIFNeuronLayer(NeuronLayer):
     """ Implements a layer of Leaky Integrate-and-fire Neurons.
     Contains multiple convenience creation functions.
 
+    Implements this timestep function:
+        v(t+1) = v(t) + (input * resistance - v(t)) / tau * dt
+
+    Or in more traditional form:
+        tau * dV/dt = IR - V
+
+    (subject to threshholding and refractory period)
+
     Configuration values can be different for each neuron:
         resistance: np.array(floats)
         tau: time constant, np.array(floats)
@@ -85,7 +93,7 @@ class LIFNeuronLayer(NeuronLayer):
         """ LIFNeuronLayer constructor
         Args:
             neuron_configuration: 2d numpy array; columns are
-            resistance, tau, capacitance, n_refrac
+            resistance, tau, threshhold, n_refrac
             dt: single timestep dt value.
         """
         super().__init__(name)
