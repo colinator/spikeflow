@@ -31,6 +31,7 @@ def firing_to_spike_process(firing):
     Returns:
         spike_process for a single neuron
     """
+    # return np.argwhere(firing).ravel()
     return np.reshape(np.argwhere(firing), (-1,))
 
 
@@ -72,3 +73,17 @@ def spike_processes_to_firings(spike_processes, max_length=None):
     for i, spike_process in enumerate(spike_processes):
         firings[spike_process,i] = True
     return firings
+
+
+def spike_process_delta_times(pre_spike_process, post_spike_process):
+    """ Calculates the delta times for all combinations of pre and post
+    spike times, in one big array.
+    Args:
+        pre_spike_processes: spike_process of presynaptic neuron
+        post_spike_processes: spike_process of postsynaptic neuron
+    Returns:
+        list of np.array(varying n, float32): for each spike process, the
+            array of time differences; post_spike_times - each pre spike time,
+            for each pre spike time
+    """
+    return np.array([ post_spike_process - pre_spike_time for pre_spike_time in pre_spike_process ]).ravel()

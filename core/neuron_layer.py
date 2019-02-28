@@ -286,6 +286,15 @@ class IzhikevichNeuronLayer(NeuronLayer):
         return np.array([a_dist(n), b_dist(n), c_dist(n), d_dist(n), t_dist(n), v0_dist(n)]).T
 
     @classmethod
+    def layer_with_configuration(cls, name, configuration, dt):
+        """ Creates a layer from a configuration
+        Args:
+            configuration: numpy configuration (as returned from configuration_with_*)
+            dt: state update timestep, float
+        """
+        return cls(name, configuration, dt)
+
+    @classmethod
     def layer_with_configurations(cls, name, configurations, dt):
         """ Creates a layer from a list of configurations
         Args:

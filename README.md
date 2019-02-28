@@ -34,8 +34,9 @@ The library will implement:
   - [x] synapses with delay
 - out-of-graph and in-graph learning rules, including
   - [x] out-of-graph weight modification
-  - [ ] simple hebbian synaptic modification
-  - [ ] symmetric and asymmetric STDP
+  - [x] out-of-graph STDP, compatible with model.step_time's end timestep callback
+  - [ ] in-graph STDP
+  - [ ] others? taking requests!
 - forms of dynamic neural network construction, including
   - [ ] Synaptic pruning and synaptogenesis
   - [ ] Neuron pruning and neurogenesis
