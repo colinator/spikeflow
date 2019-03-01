@@ -20,6 +20,7 @@ The library will implement:
 - multiple models of spiking neurons, including
   - [x] Leaky Integrate-and-fire
   - [x] Izhikevich
+  - [x] Poisson (can convert things like images to spike trains)
   - [ ] Hodgkin-Huxley? Taking requests...
 - arbitrary connections between layers of similar neurons, including
   - [x] feed-foward

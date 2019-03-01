@@ -67,6 +67,49 @@ class IdentityNeuronLayer(NeuronLayer):
         self.assign_op = self.output.assign(self.input)
 
 
+class PoissonNeuronLayer(NeuronLayer):
+
+    """ Implements a layer of Poisson-sampling neurons. Output shape = input shape.
+
+    Given inputs as probabilities BETWEEN 0 AND 1, output is 1 if a uniformly
+    drawn random number is < input.
+
+    Useful for doing things like converting images to poisson spike trains.
+    """
+
+    def __init__(self, name, n):
+        super().__init__(name)
+        self.n = n
+        if n <= 0:
+            raise ValueError('PoissonNeuronLayer must have at least one neuron.')
+
+    @property
+    def input_n(self):
+        return self.n
+
+    @property
+    def output_n(self):
+        return self.n
+
+    def _ops(self):
+        return [self.input, self.assign_op]
+
+    def ops_format(self):
+        return ['input', 'output']
+
+    def _compile(self):
+        zeros = np.zeros(self.input.shape, dtype=np.float32)
+        ones = np.ones(self.input.shape, dtype=np.float32)
+
+        self.output = tf.Variable(zeros, dtype=np.float32, name='output')
+
+        samples = tf.random.uniform(self.input.shape, 0.0, 1.0, np.float32)
+        sample_firings = tf.where(samples < self.input, ones, zeros)
+
+        self.assign_op = self.output.assign(sample_firings)
+
+
+
 class LIFNeuronLayer(NeuronLayer):
 
     """ Implements a layer of Leaky Integrate-and-fire Neurons.
