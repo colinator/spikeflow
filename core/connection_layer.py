@@ -25,7 +25,7 @@ def weights_from_synapses(from_layer, to_layer, synapses):
     return w
 
 
-def weights_connecting_from_to(from_layer, to_layer, connectivity, v_sampler, from_range=None, to_range=None):
+def weights_connecting_from_to(from_layer, to_layer, connectivity, v_sampler, from_range=None, to_range=None, exclude=None):
     """ Constructs a weight matrix by connecting each neuron in from_layer to
     a random set of neurons in to_layer.
 
@@ -39,6 +39,7 @@ def weights_connecting_from_to(from_layer, to_layer, connectivity, v_sampler, fr
         to control connectivity from a subset of pre-synaptic neurons
         to_range: tuple of (from: int index, to: int index), or None. Use this
         to control connectivity to a subset of post-synaptic neurons
+        exclude: [(x,y)] - those weights are set to 0
     Return:
         weights: np.array((from_layer.n, to_layer.n), float32)
     """
@@ -51,6 +52,9 @@ def weights_connecting_from_to(from_layer, to_layer, connectivity, v_sampler, fr
         to_neuron_indexes = np.random.choice(tr[1]-tr[0], n, replace=False) + tr[0]
         for to_i, v in zip(to_neuron_indexes, v_arr):
             w[from_i, to_i] = v
+    if exclude:
+        for x, y in exclude:
+            w[x, y] = 0.0
     return w
 
 
@@ -104,7 +108,7 @@ class ConnectionLayer(ComputationLayer):
         before compile(), and must create an output tensor, which will be
         connected to to_layer's input.
         """
-        pass
+        raise NotImplementedError
 
 
 class SynapseLayer(ConnectionLayer):
@@ -130,14 +134,26 @@ class SynapseLayer(ConnectionLayer):
         return [self.input, self.output_op]
 
     def ops_format(self):
+        # should we change to { key: node }?
         return ['input', 'output']
 
     def _compile(self):
+        # create variables
         self.weights = tf.Variable(self.w)
+
+        # compute output: input * weights
         input_f = tf.to_float(self.input)
         o = tf.matmul(tf.expand_dims(input_f, 0), self.weights)
         o_reshaped = tf.reshape(o, [-1])
         self.output_op = self.output.assign(o_reshaped)
+
+    def set_weights_in_session(self, w, sess):
+        self.w = w
+        sess.run(self.weights.assign(w))
+
+    def set_weights_in_graph(self, w, graph):
+        with tf.Session(graph=graph) as sess:
+            self.set_weights_in_session(w, sess)
 
 
 
@@ -156,7 +172,8 @@ class ComplexSynapseLayer(SynapseLayer):
         tensor will be of shape n x max_delay.
     """
 
-    def __init__(self, name, from_layer, to_layer, weights, decay=None, failure_prob=None, post_synaptic_reset_factor=None, delay=None, max_delay=None):
+    def __init__(self, name, from_layer, to_layer, weights, decay=None, failure_prob=None, post_synaptic_reset_factor=None, delay=None, max_delay=None): #, stdp_params=None,
+    #weight_bounds=None):
         """ Constructs a ComplexSynapseLayer.
         Args:
             from_layer: from neuron layer
@@ -179,6 +196,13 @@ class ComplexSynapseLayer(SynapseLayer):
         self.post_synaptic_reset_factor = post_synaptic_reset_factor
         self.delay = delay if not np.isscalar(delay) else delays_for_weights(weights, identical_ints_sampler(delay))
         self.max_delay = max_delay
+
+    def _ops(self):
+        return [self.input, self.output_op]
+
+    def ops_format(self):
+        return ['input', 'output']
+
 
     def _compile(self):
 
@@ -256,3 +280,148 @@ class ComplexSynapseLayer(SynapseLayer):
 
         # top of graph
         self.output_op = self.output.assign(o_reset)
+
+
+
+
+# def compiled_stdp_graph_w1(w, input, output, stdp_params):
+#     dW = tf.Variable(np.zeros(w.shape), dtype=tf.float32)
+#
+#     pre_synaptic_traces = tf.Variable(np.zeros((w.shape[0],)), dtype=tf.float32)
+#     post_synaptic_traces = tf.Variable(np.zeros((w.shape[1],)), dtype=tf.float32)
+#     #self.post_synaptic_triplet_traces = tf.Variable(np.zeros((self.w.shape[1],)), dtype=tf.float32)
+#
+#     pre_synaptic_traces_decayed = pre_synaptic_traces / stdp_params.TauPlus
+#     post_synaptic_traces_decayed = post_synaptic_traces / stdp_params.TauMinus
+#
+#     pre_synaptics_activated = input * stdp_params.APlus
+#     post_synaptics_activated = output * stdp_params.AMinus * -1.0
+#
+#     if stdp_params.all_to_all:
+#         new_pre_synaptic_traces = pre_synaptic_traces_decayed + pre_synaptics_activated
+#         new_post_synaptic_traces = post_synaptic_traces_decayed + post_synaptics_activated
+#     else:
+#         new_pre_synaptic_traces = tf.min(pre_synaptic_traces_decayed + pre_synaptics_activated, stdp_params.APlus)
+#         new_post_synaptic_traces = tf.min(pre_synaptic_traces_decayed + post_synaptics_activated, stdp_params.AMinus)
+#
+#     pre_synaptic_traces = tf.assign(pre_synaptic_traces, new_pre_synaptic_traces)
+#     post_synaptic_traces = tf.assign(post_synaptic_traces, new_post_synaptic_traces)
+#
+#     pre_dw = output * pre_synaptic_traces
+#     post_dw = input * post_synaptic_traces
+#
+#     tdw = tf.add(pre_dw, post_dw)
+#     ndw = dW + tdw
+#     dW = dW.assign(ndw)
+#
+#     return dW
+#
+#
+# def compiled_stdp_graph(w, input, output, stdp_params):
+#
+#     # --- define variables ---
+#
+#     # dW is the change-in-weight matrix: what we want to actually calculate
+#     dW = tf.Variable(np.zeros(w.shape), dtype=tf.float32)
+#
+#     # pre- and post-synaptic neuron firings will leave traces used to compute dW
+#     pre_synaptic_traces = tf.Variable(np.zeros((w.shape[0],)), dtype=tf.float32)
+#     post_synaptic_traces = tf.Variable(np.zeros((w.shape[1],)), dtype=tf.float32)
+#     if stdp_params.uses_triplet_rule:
+#         post_synaptic_triplet_traces = tf.Variable(np.zeros((w.shape[1],)), dtype=tf.float32)
+#
+#
+#     # --- decay traces, raise by A+ or A- for pre- and post-synaptic spikes ---
+#
+#     # decay all traces exponentially
+#     pre_synaptic_traces_decayed = pre_synaptic_traces / stdp_params.TauPlus
+#     post_synaptic_traces_decayed = post_synaptic_traces / stdp_params.TauMinus
+#     if stdp_params.uses_triplet_rule:
+#         post_synaptic_triplet_traces_decayed = post_synaptic_triplet_traces / stdp_params.TauMinusTriplet
+#
+#     # for each pre- or post-synaptic spike, change the appropriate trace by a factor
+#     pre_synaptics_activated = input * stdp_params.APlus
+#     post_synaptics_activated = output * stdp_params.AMinus * -1.0
+#     if stdp_params.uses_triplet_rule:
+#         post_synaptics_triplet_activated = output * stdp_params.AMinusTriplet * -1.0
+#
+#     # update the traces
+#     new_pre_synaptic_traces = pre_synaptic_traces_decayed + pre_synaptics_activated
+#     new_post_synaptic_traces = post_synaptic_traces_decayed + post_synaptics_activated
+#     if stdp_params.uses_triplet_rule:
+#         new_post_synaptic_triplet_traces = post_synaptic_triplet_traces_decayed + post_synaptics_triplet_activated
+#
+#     # if it's not 'all-to-all', then cap traces at the appropriate level
+#     if not stdp_params.all_to_all:
+#         new_pre_synaptic_traces = tf.minimum(new_pre_synaptic_traces, stdp_params.APlus)
+#         new_post_synaptic_traces = tf.minimum(new_post_synaptic_traces, stdp_params.AMinus)
+#         if stdp_params.uses_triplet_rule:
+#             new_post_synaptic_triplet_traces = tf.minimum(new_post_synaptic_triplet_traces, stdp_params.AMinusTriplet)
+#
+#     # assign new traces
+#     pre_synaptic_traces = tf.assign(pre_synaptic_traces, new_pre_synaptic_traces)
+#     post_synaptic_traces = tf.assign(post_synaptic_traces, new_post_synaptic_traces)
+#     if stdp_params.uses_triplet_rule:
+#         post_synaptic_triplet_traces = tf.assign(post_synaptic_triplet_traces, new_post_synaptic_triplet_traces)
+#
+#     # contributions to dW are given by post-synaptic spikes * pre-synaptic traces,
+#     # and pre-synaptic spikes * post-synaptic traces
+#     pre_dw = output * pre_synaptic_traces
+#     post_dw = input * post_synaptic_traces
+#     if stdp_params.uses_triplet_rule:
+#         post_dw = post_dw + input * post_synaptic_triplet_traces
+#
+#     # total dW is sum of both
+#     tdw = tf.add(pre_dw, post_dw)
+#     ndw = dW + tdw
+#     dW = dW.assign(ndw)
+#
+#     # filter dW by W? Don't even bother?
+#     if stdp_params.uses_triplet_rule:
+#         return dW, pre_synaptic_traces, post_synaptic_traces, post_synaptic_triplet_traces
+#     else:
+#         return dW, pre_synaptic_traces, post_synaptic_traces
+#
+#
+# class STDP_Tester:
+#
+#     def __init__(self, w, stdp_params):
+#         self.w = w
+#         self.stdp_params = stdp_params
+#
+#     def compile_stdp_graph(self):
+#         self.input = tf.placeholder(tf.float32, shape=(self.w.shape[0],), name='input')
+#         self.output = tf.placeholder(tf.float32, shape=(self.w.shape[1],), name='output')
+#         if self.stdp_params.uses_triplet_rule:
+#             self.dW, self.pre_synaptic_traces, self.post_synaptic_traces, self.post_synaptic_triplet_traces = compiled_stdp_graph(self.w, self.input, self.output, self.stdp_params)
+#         else:
+#             self.dW, self.pre_synaptic_traces, self.post_synaptic_traces = compiled_stdp_graph(self.w, self.input, self.output, self.stdp_params)
+#
+#     def test(self, input_firings, output_firings):
+#         graph = tf.Graph()
+#         with graph.as_default():
+#             self.compile_stdp_graph()
+#
+#         pre_traces = []
+#         post_traces = []
+#         post_triplet_traces = []
+#         last_dw = None
+#         with tf.Session(graph=graph) as sess:
+#             tf.global_variables_initializer().run()
+#
+#             runnables = [self.dW, self.pre_synaptic_traces, self.post_synaptic_traces, self.post_synaptic_triplet_traces] if self.stdp_params.uses_triplet_rule else [self.dW, self.pre_synaptic_traces, self.post_synaptic_traces]
+#
+#             for input_v, output_v in zip(input_firings, output_firings):
+#
+#                 results = sess.run(runnables, feed_dict={self.input: input_v, self.output: output_v})
+#                 last_dw = results[0]
+#                 pre_traces.append(results[1])
+#                 post_traces.append(results[2])
+#
+#                 if self.stdp_params.uses_triplet_rule:
+#                     post_triplet_traces.append(results[3])
+#
+#         if self.stdp_params.uses_triplet_rule:
+#             return last_dw, np.array(pre_traces), np.array(post_traces), np.array(post_triplet_traces)
+#         else:
+#             return last_dw, np.array(pre_traces), np.array(post_traces)

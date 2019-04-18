@@ -20,7 +20,7 @@ class NeuronLayer(ComputationLayer):
     def input_n(self):
         """ Subclasses must implement; returns number of inputs
         """
-        pass
+        raise NotImplementedError
 
     @property
     def output_n(self):
@@ -28,7 +28,7 @@ class NeuronLayer(ComputationLayer):
         For normal neuron layers, should be equal to input_n. Composite
         layers might be different.
         """
-        pass
+        raise NotImplementedError
 
     def add_input(self, new_input):
         """ Adds the new_input to the summation operation tree.
@@ -41,9 +41,10 @@ class NeuronLayer(ComputationLayer):
 class IdentityNeuronLayer(NeuronLayer):
     """ Implements a layer of pass-through neurons. Output = Input """
 
-    def __init__(self, name, n):
+    def __init__(self, name, n, bound=None):
         super().__init__(name)
         self.n = n
+        self.bound = bound
 
         if n <= 0:
             raise ValueError('IdentityNeuronLayer must have at least one neuron.')
@@ -64,7 +65,10 @@ class IdentityNeuronLayer(NeuronLayer):
 
     def _compile(self):
         self.output = tf.Variable(np.zeros(self.input.shape, dtype=np.float32), dtype=np.float32, name='output')
-        self.assign_op = self.output.assign(self.input)
+        if self.bound is None:
+            self.assign_op = self.output.assign(self.input)
+        else:
+            self.assign_op = self.output.assign(tf.minimum(self.input, np.ones(self.input.shape, dtype=np.float32)*self.bound))
 
 
 class PoissonNeuronLayer(NeuronLayer):
@@ -185,7 +189,7 @@ class LIFNeuronLayer(NeuronLayer):
             resistance, tau, threshhold, n_refrac: floats
             dt: state update timestep, float
         """
-        configuration = np.tile(np.array([r, c, t, refrac]), (n,1))
+        configuration = np.tile(np.array([resistance, tau, threshhold, n_refrac], dtype=np.float32), (n,1))
         return cls(name, configuration, dt)
 
     @classmethod

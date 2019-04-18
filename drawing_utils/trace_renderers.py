@@ -10,7 +10,7 @@ The point of this library is not really these convenience rendering functions.
 But maybe they'll be quick and dirty help.
 """
 
-def render_signal(ax, name, signal, colorCode, show_yticks=True, alpha=1.0, linewidth=1.0):
+def render_signal(ax, name, signal, colorCode, show_yticks=True, alpha=1.0, linewidth=1.0, marker=None, linestyle='-'):
     plt.box(on=None)
     ax.set_ylabel(name, color=colorCode)
     ax.tick_params('y', colors=colorCode)
@@ -18,7 +18,7 @@ def render_signal(ax, name, signal, colorCode, show_yticks=True, alpha=1.0, line
     plt.xticks([])
     if not show_yticks:
         plt.yticks([])
-    plt.plot(signal, colorCode, alpha=alpha, linewidth=linewidth)
+    plt.plot(signal, colorCode, alpha=alpha, linestyle=linestyle, linewidth=linewidth, marker=marker)
 
 
 class TraceRenderer:
@@ -128,6 +128,54 @@ class NeuronFiringsRenderer(TraceRenderer):
         plt.imshow(data_to_render, aspect='auto', interpolation='nearest')
         #plt.imshow(data_to_render, 'Blues', aspect='auto', interpolation='nearest')
         #plt.imshow(data_to_render, 'RdBu', aspect='auto', interpolation='nearest')
+
+
+class STDPTracesRenderer(TraceRenderer):
+
+    def __init__(self, traces, name):
+        super().__init__(traces, name)
+        self.pre_synaptic_traces = traces[0]
+        self.post_synaptic_traces = traces[1]
+        self.post_synaptic_triplet_traces = traces[2] if len(traces) > 2 else None
+
+    def _height_of(self, trc):
+        return 0.6 * trc.shape[1] if trc is not None else 0
+
+    def height(self, dpi):
+        return self._height_of(self.pre_synaptic_traces) + \
+               self._height_of(self.post_synaptic_traces) + \
+               self._height_of(self.post_synaptic_triplet_traces) + \
+               2.0
+
+    def _height_ratios_of(self, trc):
+        if trc is None: return []
+        return [2] + [1] * trc.shape[1]
+
+    def subfigure_height_ratios(self, dpi):
+        return self._height_ratios_of(self.pre_synaptic_traces) + \
+               self._height_ratios_of(self.post_synaptic_traces) + \
+               self._height_ratios_of(self.post_synaptic_triplet_traces)
+
+    def render(self, fig, gs, gs_start, start_time, end_time):
+        for i in range(self.pre_synaptic_traces.shape[1]):
+            ax = fig.add_subplot(gs[gs_start+i+1])
+            if i == 0:
+                ax.set_title('pre-synaptic traces x')
+            render_signal(ax, r'$x_{' + str(i) + '}$', self.pre_synaptic_traces[start_time:end_time,i], 'b', show_yticks=True, marker='.', linestyle='--')
+
+        for j in range(self.post_synaptic_traces.shape[1]):
+            ax = fig.add_subplot(gs[gs_start+i+j+3])
+            if j == 0:
+                ax.set_title('post-synaptic traces y')
+            render_signal(ax, r'$y_{' + str(j) + '}$', self.post_synaptic_traces[start_time:end_time,j], 'b', show_yticks=True, marker='.', linestyle='--')
+
+        if self.post_synaptic_triplet_traces is not None:
+            for k in range(self.post_synaptic_triplet_traces.shape[1]):
+                ax = fig.add_subplot(gs[gs_start+i+k+j+5])
+                if k == 0:
+                    ax.set_title('post-synaptic triplet traces yt')
+                render_signal(ax, r'$yt_{' + str(j) + '}$', self.post_synaptic_triplet_traces[start_time:end_time,k], 'b', show_yticks=True, marker='.', linestyle='--')
+
 
 
 def render_figure(renderers, start_time, end_time, dpi=100):

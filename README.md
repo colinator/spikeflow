@@ -36,7 +36,8 @@ The library will implement:
 - out-of-graph and in-graph learning rules, including
   - [x] out-of-graph weight modification
   - [x] out-of-graph STDP, compatible with model.step_time's end timestep callback
-  - [ ] in-graph STDP
+  - [x] in-graph STDP with weight bounds
+  - [ ] three-factor STDP
   - [ ] others? taking requests!
 - forms of dynamic neural network construction, including
   - [ ] Synaptic pruning and synaptogenesis

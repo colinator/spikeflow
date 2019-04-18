@@ -1,6 +1,7 @@
 import numpy as np
 from collections import namedtuple
 
+
 UniformDistribution = namedtuple('UniformDistribution', ['low', 'high'])
 NormalDistribution = namedtuple('NormalDistribution', ['mean', 'stddev'])
 
