@@ -172,8 +172,7 @@ class ComplexSynapseLayer(SynapseLayer):
         tensor will be of shape n x max_delay.
     """
 
-    def __init__(self, name, from_layer, to_layer, weights, decay=None, failure_prob=None, post_synaptic_reset_factor=None, delay=None, max_delay=None): #, stdp_params=None,
-    #weight_bounds=None):
+    def __init__(self, name, from_layer, to_layer, weights, decay=None, failure_prob=None, post_synaptic_reset_factor=None, delay=None, max_delay=None): 
         """ Constructs a ComplexSynapseLayer.
         Args:
             from_layer: from neuron layer

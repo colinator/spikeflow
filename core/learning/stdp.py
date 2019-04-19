@@ -159,12 +159,14 @@ class STDPLearningRule(LearningRule):
         post_synaptic_trace_conts = tf.Variable(np.zeros((W.shape[1],)), dtype=tf.float32)
 
         # compute trace inputs
-        input_r = tf.reshape(input, [input.shape[0], 1])
-        output_r = tf.reshape(output, [output.shape[0], 1])
-        pre_r = tf.reshape(pre_synaptic_trace_conts, [pre_synaptic_trace_conts.shape[0], 1])
-        post_r = tf.reshape(post_synaptic_trace_conts, [post_synaptic_trace_conts.shape[0], 1])
-        step_pre_dw = tf.transpose(output_r * tf.transpose(pre_r))
-        step_post_dw = input_r * tf.transpose(post_r)
+        input_cast = tf.cast(input, tf.float32)
+        output_cast = tf.cast(output, tf.float32)
+        input_reshaped = tf.reshape(input_cast, [input_cast.shape[0], 1])
+        output_reshaped = tf.reshape(output_cast, [output_cast.shape[0], 1])
+        pre_reshaped = tf.reshape(pre_synaptic_trace_conts, [pre_synaptic_trace_conts.shape[0], 1])
+        post_reshaped = tf.reshape(post_synaptic_trace_conts, [post_synaptic_trace_conts.shape[0], 1])
+        step_pre_dw = tf.transpose(output_reshaped * tf.transpose(pre_reshaped))
+        step_post_dw = input_reshaped * tf.transpose(post_reshaped)
 
         acc_pre_dw = self.pre_dw + step_pre_dw
         acc_post_dw = self.post_dw + step_post_dw
@@ -175,7 +177,7 @@ class STDPLearningRule(LearningRule):
         with tf.control_dependencies([self.accumulate_pre_dw, self.accumulate_post_dw]):
 
             # instantiate partial graph for stdp traces
-            pre_conts, post_conts = self.stdp_tracer._compile(W, input, output, pre_synaptic_trace_conts, post_synaptic_trace_conts)
+            pre_conts, post_conts = self.stdp_tracer._compile(W, input_cast, output_cast, pre_synaptic_trace_conts, post_synaptic_trace_conts)
 
             # assign new trace contributions
             a1 = pre_synaptic_trace_conts.assign(pre_conts)

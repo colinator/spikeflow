@@ -183,7 +183,7 @@ class LIFNeuronLayer(NeuronLayer):
         return cls(name, configuration, dt)
 
     @classmethod
-    def layer_with_n_identical_neurons(cls, name, n, resistance, tau, threshhold, n_refrac, dt):
+    def layer_with_n_identical_neurons(cls, name, n, resistance, tau, threshhold, n_refrac, dt=0.5):
         """ Creates a layer of n identical neurons.
         Args:
             resistance, tau, threshhold, n_refrac: floats
@@ -193,7 +193,7 @@ class LIFNeuronLayer(NeuronLayer):
         return cls(name, configuration, dt)
 
     @classmethod
-    def layer_with_n_distributions(cls, name, n, resistance_dist, tau_dist, threshhold_dist, n_refrac_dist, dt):
+    def layer_with_n_distributions(cls, name, n, resistance_dist, tau_dist, threshhold_dist, n_refrac_dist, dt=0.5):
         """ Creates a layer of n neurons, whose configuration values are pulled from
         distribution generation functions.
         Args:
@@ -333,7 +333,7 @@ class IzhikevichNeuronLayer(NeuronLayer):
         return np.array([a_dist(n), b_dist(n), c_dist(n), d_dist(n), t_dist(n), v0_dist(n)]).T
 
     @classmethod
-    def layer_with_configuration(cls, name, configuration, dt):
+    def layer_with_configuration(cls, name, configuration, dt=0.5):
         """ Creates a layer from a configuration
         Args:
             configuration: numpy configuration (as returned from configuration_with_*)
@@ -342,7 +342,7 @@ class IzhikevichNeuronLayer(NeuronLayer):
         return cls(name, configuration, dt)
 
     @classmethod
-    def layer_with_configurations(cls, name, configurations, dt):
+    def layer_with_configurations(cls, name, configurations, dt=0.5):
         """ Creates a layer from a list of configurations
         Args:
             configuration: list of configurations
@@ -351,7 +351,7 @@ class IzhikevichNeuronLayer(NeuronLayer):
         return cls(name, np.concatenate(configurations), dt)
 
     @classmethod
-    def layer_with_n_identical_neurons(cls, name, n, a, b, c, d, t, v0, dt):
+    def layer_with_n_identical_neurons(cls, name, n, a, b, c, d, t, v0, dt=0.5):
         """ Creates a layer of n identical neurons.
         Args:
             a, b, c, d, t, v0: floats
@@ -360,7 +360,7 @@ class IzhikevichNeuronLayer(NeuronLayer):
         return cls(name, cls.configuration_with_n_identical_neurons(n, a, b, c, d, t, v0), dt)
 
     @classmethod
-    def layer_with_n_distributions(cls, name, n, a_dist, b_dist, c_dist, d_dist, t_dist, v0_dist, dt):
+    def layer_with_n_distributions(cls, name, n, a_dist, b_dist, c_dist, d_dist, t_dist, v0_dist, dt=0.5):
         """ Creates a layer of n neurons, whose configuration values are pulled from
         distribution generation functions.
         Args:
