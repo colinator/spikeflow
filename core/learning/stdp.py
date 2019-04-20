@@ -9,7 +9,9 @@ from spikeflow.core.spike_process import *
 class STDPParams:
 
     """ Parameters governing stdp, as described here:
-    http://www.scholarpedia.org/article/Spike-timing_dependent_plasticity """
+    http://www.scholarpedia.org/article/Spike-timing_dependent_plasticity
+    Can perform 'associative' STDP as well: if AMinus is None.
+    """
 
     def __init__(self, APlus=1.0, TauPlus=10.0, AMinus=1.0, TauMinus=10.0, all_to_all=True):
         self.APlus = APlus
@@ -18,8 +20,14 @@ class STDPParams:
         self.TauMinus = TauMinus
         self.all_to_all = all_to_all
 
+    @property
+    def is_associative(self):
+        return self.AMinus is None
+
     def __str__(self):
-        return 'STDPParams A:{0:1.2f} A-:{1:1.2f} T+:{2:1.2f} T-:{3:1.2f}'.format(self.APlus, self.AMinus, self.TauPlus, self.TauMinus)
+        a_minus_string = '' if self.is_associative else ' A-:{0:1.2f}'.format(self.AMinus,)
+        associative_string = ' Associative!' if self.is_associative else ''
+        return 'STDPParams A+:{0:1.2f}{1} T+:{2:1.2f} T-:{3:1.2f}{4}'.format(self.APlus, a_minus_string, self.TauPlus, self.TauMinus, associative_string)
 
 
 class STDP_Tracer:
@@ -49,7 +57,10 @@ class STDP_Tracer:
 
         # for each pre- or post-synaptic spike, change the appropriate trace by a factor
         pre_synaptics_activated = input * stdp_params.APlus
-        post_synaptics_activated = output * stdp_params.AMinus * -1.0
+        if self.stdp_params.is_associative:
+            post_synaptics_activated = output * stdp_params.APlus
+        else:
+            post_synaptics_activated = output * stdp_params.AMinus * -1.0
 
         # update the traces
         new_pre_synaptic_traces = pre_synaptic_traces_decayed + pre_synaptics_activated
@@ -58,7 +69,10 @@ class STDP_Tracer:
         # if it's not 'all-to-all', then cap traces at the appropriate level
         if not stdp_params.all_to_all:
             new_pre_synaptic_traces = tf.minimum(new_pre_synaptic_traces, stdp_params.APlus)
-            new_post_synaptic_traces = tf.minimum(new_post_synaptic_traces, stdp_params.AMinus)
+            if self.stdp_params.is_associative:
+                new_post_synaptic_traces = tf.minimum(new_post_synaptic_traces, stdp_params.APlus)
+            else:
+                new_post_synaptic_traces = tf.minimum(new_post_synaptic_traces, stdp_params.AMinus)
 
         # assign new traces
         pre_synaptic_traces = tf.assign(pre_synaptic_traces, new_pre_synaptic_traces)
@@ -148,8 +162,50 @@ class STDPLearningRule(LearningRule):
         self.assign_W = None
         self.zero_out = None
 
+    # compilation fragments:
 
-    def __compile_accumulate(self, W, input, output):
+    def __compile_step_pre_dw(self, output, pre_synaptic_trace_conts):
+        output_reshaped = tf.reshape(output, [output.shape[0], 1])
+        pre_reshaped = tf.reshape(pre_synaptic_trace_conts, [pre_synaptic_trace_conts.shape[0], 1])
+        return tf.transpose(output_reshaped * tf.transpose(pre_reshaped))
+
+    def __compile_step_post_dw(self, input, post_synaptic_trace_conts):
+        input_reshaped = tf.reshape(input, [input.shape[0], 1])
+        post_reshaped = tf.reshape(post_synaptic_trace_conts, [post_synaptic_trace_conts.shape[0], 1])
+        return input_reshaped * tf.transpose(post_reshaped)
+
+    def __compile_accumulate_associative(self, W, input, output):
+
+        # -- define variables --
+        self.pre_dw = tf.Variable(np.zeros(W.shape), dtype=tf.float32)
+        self.post_dw = tf.Variable(np.zeros(W.shape), dtype=tf.float32)
+
+        pre_synaptic_trace_conts = tf.Variable(np.zeros((W.shape[0],)), dtype=tf.float32)
+        post_synaptic_trace_conts = tf.Variable(np.zeros((W.shape[1],)), dtype=tf.float32)
+
+        # instantiate partial graph for stdp traces
+        pre_conts, post_conts = self.stdp_tracer._compile(W, input, output, pre_synaptic_trace_conts, post_synaptic_trace_conts)
+
+        # assign new trace contributions
+        a1 = pre_synaptic_trace_conts.assign(pre_conts)
+        a2 = post_synaptic_trace_conts.assign(post_conts)
+        self.assignments = tf.group(a1, a2)
+
+        with tf.control_dependencies([self.assignments]):
+
+            step_pre_dw = self.__compile_step_pre_dw(output, pre_synaptic_trace_conts)
+            step_post_dw = self.__compile_step_post_dw(input, post_synaptic_trace_conts)
+
+            step_pre_dw = tf.where(tf.math.logical_and(step_pre_dw > 0, step_post_dw > 0), step_pre_dw * 0.5, step_pre_dw)
+            step_post_dw = tf.where(tf.math.logical_and(step_pre_dw > 0, step_post_dw > 0), step_post_dw * 0.5, step_post_dw)
+
+            acc_pre_dw = self.pre_dw + step_pre_dw
+            acc_post_dw = self.post_dw + step_post_dw
+
+            self.accumulate_pre_dw = self.pre_dw.assign(acc_pre_dw)
+            self.accumulate_post_dw = self.post_dw.assign(acc_post_dw)
+
+    def __compile_accumulate_standard(self, W, input, output):
 
         # -- define variables --
         self.pre_dw = tf.Variable(np.zeros(W.shape), dtype=tf.float32)
@@ -159,14 +215,8 @@ class STDPLearningRule(LearningRule):
         post_synaptic_trace_conts = tf.Variable(np.zeros((W.shape[1],)), dtype=tf.float32)
 
         # compute trace inputs
-        input_cast = tf.cast(input, tf.float32)
-        output_cast = tf.cast(output, tf.float32)
-        input_reshaped = tf.reshape(input_cast, [input_cast.shape[0], 1])
-        output_reshaped = tf.reshape(output_cast, [output_cast.shape[0], 1])
-        pre_reshaped = tf.reshape(pre_synaptic_trace_conts, [pre_synaptic_trace_conts.shape[0], 1])
-        post_reshaped = tf.reshape(post_synaptic_trace_conts, [post_synaptic_trace_conts.shape[0], 1])
-        step_pre_dw = tf.transpose(output_reshaped * tf.transpose(pre_reshaped))
-        step_post_dw = input_reshaped * tf.transpose(post_reshaped)
+        step_pre_dw = self.__compile_step_pre_dw(output, pre_synaptic_trace_conts)
+        step_post_dw = self.__compile_step_post_dw(input, post_synaptic_trace_conts)
 
         acc_pre_dw = self.pre_dw + step_pre_dw
         acc_post_dw = self.post_dw + step_post_dw
@@ -177,13 +227,21 @@ class STDPLearningRule(LearningRule):
         with tf.control_dependencies([self.accumulate_pre_dw, self.accumulate_post_dw]):
 
             # instantiate partial graph for stdp traces
-            pre_conts, post_conts = self.stdp_tracer._compile(W, input_cast, output_cast, pre_synaptic_trace_conts, post_synaptic_trace_conts)
+            pre_conts, post_conts = self.stdp_tracer._compile(W, input, output, pre_synaptic_trace_conts, post_synaptic_trace_conts)
 
             # assign new trace contributions
             a1 = pre_synaptic_trace_conts.assign(pre_conts)
             a2 = post_synaptic_trace_conts.assign(post_conts)
             self.assignments = tf.group(a1, a2)
 
+
+    def __compile_accumulate(self, W, input, output):
+        input_cast = tf.cast(input, tf.float32)
+        output_cast = tf.cast(output, tf.float32)
+        if self.stdp_tracer.stdp_params.is_associative:
+            self.__compile_accumulate_associative(W, input_cast, output_cast)
+        else:
+            self.__compile_accumulate_standard(W, input_cast, output_cast)
 
     def __compile_apply(self, W):
 
