@@ -4,21 +4,25 @@ from tensorflow.python.ops import control_flow_ops
 from spikeflow.core.learning.learning_rule import LearningRule
 from spikeflow.core.learning.weight_bounds import WeightBounds, WeightBounds_Enforcer
 from spikeflow.core.spike_process import *
+from spikeflow.core.graph_functions import *
 
 
 class STDPParams:
 
     """ Parameters governing stdp, as described here:
     http://www.scholarpedia.org/article/Spike-timing_dependent_plasticity
-    Can perform 'associative' STDP as well: if AMinus is None.
+
+    Can perform 'associative' or 'symmetric' STDP as well: if AMinus is None and
+    Sigma is a number: uses mexican-hat wavelet to compute STDP.
     """
 
-    def __init__(self, APlus=1.0, TauPlus=10.0, AMinus=1.0, TauMinus=10.0, all_to_all=True):
+    def __init__(self, APlus=1.0, TauPlus=10.0, AMinus=1.0, TauMinus=10.0, all_to_all=True, Sigma=1.0):
         self.APlus = APlus
         self.TauPlus = TauPlus
         self.AMinus = AMinus
         self.TauMinus = TauMinus
         self.all_to_all = all_to_all
+        self.Sigma = Sigma
 
     @property
     def is_associative(self):
@@ -26,8 +30,9 @@ class STDPParams:
 
     def __str__(self):
         a_minus_string = '' if self.is_associative else ' A-:{0:1.2f}'.format(self.AMinus,)
+        sigma_string = '' if not self.is_associative else ' σ:{0:1.2f}'.format(self.Sigma,)
         associative_string = ' Associative!' if self.is_associative else ''
-        return 'STDPParams A+:{0:1.2f}{1} T+:{2:1.2f} T-:{3:1.2f}{4}'.format(self.APlus, a_minus_string, self.TauPlus, self.TauMinus, associative_string)
+        return 'STDPParams A+:{0:1.2f}{1} T+:{2:1.2f} T-:{3:1.2f}{4}{5}'.format(self.APlus, a_minus_string, self.TauPlus, self.TauMinus, sigma_string, associative_string)
 
 
 class STDP_Tracer:
@@ -144,6 +149,7 @@ class STDPLearningRule(LearningRule):
         """
         super().__init__(name, connection_layer, uses_teaching_signal)
 
+        self.stdp_params = stdp_params
         self.stdp_tracer = STDP_Tracer(stdp_params)
         self.weight_bounds_enforcer = WeightBounds_Enforcer(weight_bounds) if weight_bounds else None
 
@@ -238,18 +244,24 @@ class STDPLearningRule(LearningRule):
     def __compile_accumulate(self, W, input, output):
         input_cast = tf.cast(input, tf.float32)
         output_cast = tf.cast(output, tf.float32)
-        if self.stdp_tracer.stdp_params.is_associative:
+        if self.stdp_params.is_associative:
             self.__compile_accumulate_associative(W, input_cast, output_cast)
         else:
             self.__compile_accumulate_standard(W, input_cast, output_cast)
 
     def __compile_apply(self, W):
 
-        # calculate new W
+        # add the pre and post contributions
+        new_W_step = tf.add(self.pre_dw, self.post_dw)
+
+        # if associative ('symmetric') apply the ricker wavelet
+        if self.stdp_params.is_associative:
+            new_W_step = ricker_wavelet(logsafe(new_W_step), self.stdp_params.Sigma)
+
         if self.weight_bounds_enforcer is not None:
-            new_W = self.weight_bounds_enforcer._compile(W, self.pre_dw, self.post_dw)
+            new_W = self.weight_bounds_enforcer._compile(W, new_W_step)
         else:
-            new_W = W + tf.add(self.pre_dw, self.post_dw)
+            new_W = W + new_W_step
 
         # assign new weights
         self.assign_W = W.assign(new_W)

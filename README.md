@@ -37,6 +37,7 @@ The library will implement:
   - [x] out-of-graph weight modification
   - [x] out-of-graph STDP, compatible with model.step_time's end timestep callback
   - [x] in-graph STDP with weight bounds
+  - [x] symmetric STDP
   - [ ] three-factor STDP
   - [ ] others? taking requests!
 - forms of dynamic neural network construction, including

@@ -48,10 +48,24 @@ class WeightBounds_Enforcer:
         bw = W if self.weight_bounds.Soft else _Heaviside(W)
         return bw * self.weight_bounds.EtaMinus
 
-    def _compile(self, W, pre_synaptic_trace_activations, post_synaptic_trace_activations):
-        a_plus_pre = self._APlus(W) * pre_synaptic_trace_activations
-        a_minus_post = self._AMinus(W) * post_synaptic_trace_activations # posts are already negative!
-        new_W = W + a_plus_pre + a_minus_post
+
+    def _compile(self, W, trace_activation_totals):
+
+        # OK: technically we need to do this:
+        #   a_plus_pre = self._APlus(W) * pre_synaptic_trace_activations
+        #   a_minus_post = self._AMinus(W) * post_synaptic_trace_activations # posts are already negative!
+        #   new_W = W + a_plus_pre + a_minus_post
+        #
+        # BUT: we use a trick. All the negative values in the sum will treated as
+        # depression, and all positive as potentiation. This is basically the same
+        # as above.
+
+        step_W = tf.where(
+            trace_activation_totals > 0,
+            self._APlus(W) * trace_activation_totals,
+            self._AMinus(W) * trace_activation_totals)
+
+        new_W = W + step_W
 
         # a minor nit:
         # the scholarpedia article implies that this step: the 'hard' limiting
@@ -63,7 +77,3 @@ class WeightBounds_Enforcer:
         # Is this because this is not a continuous system, but uses discrete
         # timesteps?
         return _Constrain(new_W, 0.0, self.weight_bounds.WMax)
-
-        #if self.weight_bounds.Hard:
-        #    return tf.minimum(tf.maximum(new_W, 0.0), self.weight_bounds.WMax)
-        #return new_W
